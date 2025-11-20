@@ -37,7 +37,7 @@
 
   <script>
     async function checkWL() {
-      const wl = await fetch("whitelist.json").then(r => r.json());
+      const wl = await fetch("gtdwhitelist.json").then(r => r.json());
       const addr = document.getElementById("wallet").value.trim().toLowerCase();
       const eligible = wl.includes(addr);
 
@@ -47,3 +47,4 @@
   </script>
 </body>
 </html>
+
