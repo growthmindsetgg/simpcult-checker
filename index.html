@@ -1,0 +1,49 @@
+!DOCTYPE html
+html
+head
+  titleWhitelist Checkertitle
+  style
+    body { 
+      font-family Arial; 
+      max-width 400px; 
+      margin 60px auto; 
+      text-align center; 
+    }
+    input {
+      width 90%;
+      padding 10px;
+      margin 15px 0;
+      font-size 16px;
+    }
+    button {
+      padding 10px 20px;
+      font-size 16px;
+      cursor pointer;
+    }
+    #result { 
+      margin-top 20px; 
+      font-size 20px; 
+      font-weight bold;
+    }
+  style
+head
+body
+  h2SIMP Cult GTD Whitelist Checkerh2
+
+  input id=wallet placeholder=Enter wallet address
+  button onclick=checkWL()Checkbutton
+
+  p id=resultp
+
+  script
+    async function checkWL() {
+      const wl = await fetch(whitelist.json).then(r = r.json());
+      const addr = document.getElementById(wallet).value.trim().toLowerCase();
+      const eligible = wl.includes(addr);
+
+      document.getElementById(result).innerText =
+        eligible  ELIGIBLE for GTD  Free Mint  NOT Eligible;
+    }
+  script
+body
+html
