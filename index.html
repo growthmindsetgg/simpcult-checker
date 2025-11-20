@@ -1,58 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SIMP Cult GTD Whitelist Checker</title>
-    <style>
-        body {
-            font-family: Arial;
-            max-width: 500px;
-            margin: 60px auto;
-            text-align: center;
-        }
+<title>SIMP Cult GTD Whitelist Checker</title>
 
-        input {
-            width: 90%;
-            padding: 12px;
-            margin: 15px 0;
-            font-size: 16px;
-        }
+<style>
+    body {
+        font-family: Arial;
+        max-width: 450px;
+        margin: 60px auto;
+        text-align: center;
+    }
+    input {
+        width: 100%;
+        padding: 12px;
+        margin: 15px 0;
+        font-size: 16px;
+    }
+    button {
+        padding: 12px 25px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    #result {
+        margin-top: 25px;
+        font-size: 22px;
+        font-weight: bold;
+        color: black;
+    }
+</style>
 
-        button {
-            padding: 12px 25px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        #result {
-            margin-top: 20px;
-            font-size: 22px;
-            font-weight: bold;
-        }
-    </style>
-<meta http-equiv="Cache-Control" content="no-store" />
-    
 </head>
-
 <body>
 
-    <h2>SIMP Cult GTD Whitelist Checker</h2>
+<h2>SIMP Cult GTD Whitelist Checker</h2>
 
-    <input id="wallet" placeholder="Enter wallet address">
-    <button onclick="checkWL()">Check</button>
+<input id="wallet" placeholder="Enter wallet address">
 
-    <p id="result"></p>
+<button onclick="checkWL()">Check</button>
 
-    <script>
-        async function checkWL() {
-            try {
-                const wl = await fetch("gtdwhitelist.json").then(res => res.json());
-                const addr = document.getElementById("wallet").value.trim().toLowerCase();
+<p id="result"></p>
 
-                const eligible = wl.map(x => x.toLowerCase()).includes(addr);
+<script>
+async function checkWL() {
+    try {
+        const wl = await fetch("gtdwhitelist.json").then(r => r.json());
+        const addr = document.getElementById("wallet").value.trim().toLowerCase();
 
-                document.getElementById("result").innerText =
-                    eligible ? "ELIGIBLE for 2 GTD Mint" : "NOT Eligible";
-            } catch (e) {
-                document.getElementById("result").innerText = "Error loa
+        const eligible = wl.map(x => x.toLowerCase()).includes(addr);
 
+        document.getElementById("result").innerText =
+            eligible ? "ELIGIBLE for 2 GTD Mint" : "NOT Eligible";
 
+    } catch (e) {
+        document.getElementById("result").innerText = "Error loading whitelist";
+    }
+}
+</script>
+
+</body>
+</html>
