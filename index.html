@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SIMP Cult GTD Checker</title>
+<title>SIMP Cult WL Checker</title>
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: Inter, sans-serif; }
 
@@ -15,54 +15,52 @@
         align-items: center;
     }
 
-    /* Fullscreen video */
     #bgVideo {
         position: fixed;
         top: 50%;
         left: 50%;
-        width: 130%;
+        width: 135%;
         height: auto;
         transform: translate(-50%, -50%);
         object-fit: cover;
-        filter: brightness(1.15) contrast(1.05);
+        filter: brightness(1.1) contrast(1.05);
         z-index: -2;
     }
 
-    /* Subtle dark overlay for readability */
     .overlay {
         position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(1px);
+        top: 0; 
+        left: 0;
+        width: 100%; 
+        height: 100%;
+        background: rgba(0,0,0,0.25);
+        backdrop-filter: blur(2px);
         z-index: -1;
     }
 
-    /* Main glass box */
     .panel {
-        width: 430px;
-        padding: 25px 30px;
-        border-radius: 18px;
-        background: rgba(255,255,255,0.14);
-        backdrop-filter: blur(18px) saturate(180%);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.45);
+        width: 440px;
+        padding: 28px 32px;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.45);
         text-align: center;
     }
 
     h2 {
         color: #fff;
-        font-size: 22px;
+        font-size: 23px;
         font-weight: 600;
         margin-bottom: 12px;
-        letter-spacing: 0.4px;
-        text-shadow: 0 0 8px rgba(0,0,0,0.7);
+        text-shadow: 0 0 10px rgba(0,0,0,0.7);
     }
 
     p.label {
         color: #eee;
         font-size: 13px;
         margin-bottom: 8px;
-        opacity: 0.9;
+        opacity: 0.95;
     }
 
     input {
@@ -71,8 +69,8 @@
         border: none;
         border-radius: 10px;
         font-size: 14px;
-        outline: none;
         margin-bottom: 12px;
+        outline: none;
     }
 
     button {
@@ -89,20 +87,19 @@
     }
 
     button:hover {
-        background: #ff6262;
+        background: #ff6363;
     }
 
     #result {
         padding: 12px;
         border-radius: 10px;
-        background: rgba(255,255,255,0.23);
+        background: rgba(255,255,255,0.22);
         color: #fff;
         font-size: 15px;
         font-weight: 600;
         text-shadow: 0 0 6px rgba(0,0,0,0.6);
     }
 
-    /* Bottom-left team credits */
     .credits {
         position: fixed;
         left: 20px;
@@ -145,21 +142,48 @@
 <div class="credits">
     Founder — <a href="https://x.com/cryptodurgesh">@cryptodurgesh</a><br>
     Co-Founder — <a href="https://x.com/jani_shanu">@jani_shanu</a><br>
-    Simp Artist — <a href="https.com/lambe1981">@lambe1981</a><br>
-    HR & Commander — <a href="https.com/DexDev33">@DexDev33</a>
+    Simp Artist — <a href="https://x.com/lambe1981">@lambe1981</a><br>
+    HR & Commander — <a href="https://x.com/DexDev33">@DexDev33</a>
 </div>
 
 <script>
 async function checkWL() {
     const r = document.getElementById("result");
     r.innerText = "Checking...";
+
     const addr = document.getElementById("wallet").value.trim().toLowerCase();
-    if (!addr) return r.innerText = "Enter valid wallet address";
 
-    const wl = await fetch("gtdwhitelist.json").then(res => res.json());
-    const eligible = wl.map(x => x.toLowerCase()).includes(addr);
+    if (!addr.startsWith("0x") || addr.length < 10) {
+        r.innerText = "Enter valid wallet address";
+        return;
+    }
 
-    r.innerText = eligible ? "ELIGIBLE for 2 GTD Mint" : "NOT Eligible";
+    let data;
+    try {
+        data = await fetch("whitelist.json").then(res => res.json());
+    } catch (e) {
+        r.innerText = "Whitelist file missing!";
+        return;
+    }
+
+    const entry = data[addr];
+
+    if (!entry) {
+        r.innerText = "NOT Eligible";
+        return;
+    }
+
+    const { gtd, fcfs } = entry;
+
+    if (gtd && fcfs) {
+        r.innerText = "ELIGIBLE for 2 GTD + 1 FCFS Mint";
+    } else if (gtd) {
+        r.innerText = "ELIGIBLE for 2 GTD Mint";
+    } else if (fcfs) {
+        r.innerText = "ELIGIBLE for 1 FCFS Mint";
+    } else {
+        r.innerText = "NOT Eligible";
+    }
 }
 </script>
 
