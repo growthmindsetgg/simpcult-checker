@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SIMP CULT</title>
+<style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif;}
+
+    body{
+        overflow-x:hidden;
+        background:#000;
+        color:#fff;
+    }
+
+    /* full video bg */
+    video{
+        position:fixed;
+        top:50%;
+        left:50%;
+        transform:translate(-50%,-50%);
+        width:130%;
+        height:auto;
+        object-fit:cover;
+        z-index:-2;
+    }
+
+    /* dark overlay */
+    .overlay{
+        position:fixed;
+        top:0;left:0;
+        width:100%;height:100%;
+        background:rgba(0,0,0,0.35);
+        backdrop-filter:blur(2px);
+        z-index:-1;
+    }
+
+    /* top menu */
+    .topnav{
+        position:fixed;
+        top:25px;
+        right:35px;
+        display:flex;
+        gap:22px;
+        font-size:16px;
+    }
+
+    .topnav a{
+        color:#fff;
+        text-decoration:none;
+        font-weight:600;
+        padding:7px 14px;
+        border-radius:8px;
+        background:rgba(255,255,255,0.15);
+        backdrop-filter:blur(10px);
+        transition:0.2s;
+    }
+
+    .topnav a:hover{
+        background:rgba(255,255,255,0.28);
+    }
+
+    /* story panel */
+    .story-panel{
+        width:700px;
+        max-width:92%;
+        background:rgba(0,0,0,0.55);
+        backdrop-filter:blur(12px);
+        padding:25px;
+        border-radius:18px;
+        margin:120px auto;
+        display:none;
+        text-align:center;
+    }
+
+    .story-panel img{
+        width:100%;
+        border-radius:14px;
+        margin-bottom:15px;
+    }
+
+    .story-text{
+        font-size:16px;
+        line-height:1.55;
+        opacity:0.95;
+    }
+
+</style>
+</head>
+
+<body>
+
+<video autoplay muted loop playsinline>
+    <source src="../Homepage.mp4" type="video/mp4">
+</video>
+
+<div class="overlay"></div>
+
+<!-- top right menu -->
+<div class="topnav">
+    <a href="https://x.com/monadsimpcult" target="_blank">twitter</a>
+    <a href="/checker">checker</a>
+    <a href="#" onclick="showStory()">story</a>
+</div>
+
+<!-- story section -->
+<div class="story-panel" id="storyBox">
+    <img src="../story-image.jpg">
+    <div class="story-text">
+        yo see these guys, they left their high paying job which could have been easy retirement and came to try this new evm from scratch, but wait why should you care? because in life these things inspire you. the lore of simp is not about simping for anything, it means simping for what matters to you until you get it. $simp and simp cult nft collection is not just a collection or a token, it’s the future of monad where the builders will get all the tools possible to create what they deserve. building apps and dapps is just one side, building also involves building relationships and that’s the key of all.
+    </div>
+</div>
+
+<script>
+function showStory(){
+    document.getElementById("storyBox").style.display="block";
+    window.scrollTo({top:0,behavior:"smooth"});
+}
+</script>
+
+</body>
+</html>
