@@ -1,120 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>SIMP CULT</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SIMP CULT — Home</title>
+
 <style>
-    *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif;}
-
-    body{
-        overflow-x:hidden;
-        background:#000;
-        color:#fff;
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: Inter, sans-serif;
     }
 
-    /* full video bg */
-    video{
-        position:fixed;
-        top:50%;
-        left:50%;
-        transform:translate(-50%,-50%);
-        width:130%;
-        height:auto;
-        object-fit:cover;
-        z-index:-2;
+    body {
+        background: #000;
+        color: white;
+        overflow-x: hidden;
+        scroll-behavior: smooth;
     }
 
-    /* dark overlay */
-    .overlay{
-        position:fixed;
-        top:0;left:0;
-        width:100%;height:100%;
-        background:rgba(0,0,0,0.35);
-        backdrop-filter:blur(2px);
-        z-index:-1;
+    /* Fullscreen Background Video */
+    #bgVideo {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 130%;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+        z-index: -2;
+        filter: brightness(1.15) contrast(1.05);
     }
 
-    /* top menu */
-    .topnav{
-        position:fixed;
-        top:25px;
-        right:35px;
-        display:flex;
-        gap:22px;
-        font-size:16px;
+    /* Dark overlay */
+    .overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.25);
+        z-index: -1;
     }
 
-    .topnav a{
-        color:#fff;
-        text-decoration:none;
-        font-weight:600;
-        padding:7px 14px;
-        border-radius:8px;
-        background:rgba(255,255,255,0.15);
-        backdrop-filter:blur(10px);
-        transition:0.2s;
+    /* Navbar */
+    .navbar {
+        position: fixed;
+        top: 25px;
+        right: 35px;
+        z-index: 10;
+        display: flex;
+        gap: 28px;
+        font-size: 16px;
     }
 
-    .topnav a:hover{
-        background:rgba(255,255,255,0.28);
+    .navbar a {
+        color: #c59bff;
+        text-decoration: none;
+        font-weight: 600;
+        transition: 0.2s;
     }
 
-    /* story panel */
-    .story-panel{
-        width:700px;
-        max-width:92%;
-        background:rgba(0,0,0,0.55);
-        backdrop-filter:blur(12px);
-        padding:25px;
-        border-radius:18px;
-        margin:120px auto;
-        display:none;
-        text-align:center;
+    .navbar a:hover {
+        opacity: 0.7;
     }
 
-    .story-panel img{
-        width:100%;
-        border-radius:14px;
-        margin-bottom:15px;
+    /* Hero Section */
+    .hero {
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 20px;
     }
 
-    .story-text{
-        font-size:16px;
-        line-height:1.55;
-        opacity:0.95;
+    .hero h1 {
+        font-size: 48px;
+        font-weight: 700;
+        color: #c59bff;
+        text-shadow: 0 0 15px rgba(0,0,0,0.7);
     }
 
+    /* Story Section */
+    #storySection {
+        padding: 120px 20px;
+        min-height: 100vh;
+        backdrop-filter: blur(6px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transform: translateY(40px);
+        transition: 1s ease-out;
+    }
+
+    #storySection.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .story-card {
+        max-width: 750px;
+        background: rgba(255,255,255,0.10);
+        padding: 35px;
+        border-radius: 16px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.45);
+        backdrop-filter: blur(12px);
+        text-align: center;
+        line-height: 1.5;
+    }
+
+    .story-card img {
+        width: 100%;
+        border-radius: 12px;
+        margin-bottom: 25px;
+    }
+
+    .cta {
+        margin-top: 40px;
+    }
+
+    .cta a {
+        padding: 12px 22px;
+        background: #c59bff;
+        color: #000;
+        border-radius: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: 0.2s;
+    }
+
+    .cta a:hover {
+        background: #b088ff;
+    }
 </style>
 </head>
 
 <body>
 
-<video autoplay muted loop playsinline>
-    <source src="../Homepage.mp4" type="video/mp4">
+<!-- Background Video -->
+<video id="bgVideo" autoplay muted loop playsinline>
+    <source src="Homepage.mp4" type="video/mp4">
 </video>
 
 <div class="overlay"></div>
 
-<!-- top right menu -->
-<div class="topnav">
+<!-- Navbar -->
+<div class="navbar">
+    <a href="/">home</a>
+    <a href="#storySection">story</a>
     <a href="https://x.com/monadsimpcult" target="_blank">twitter</a>
-    <a href="/checker">checker</a>
-    <a href="#" onclick="showStory()">story</a>
 </div>
 
-<!-- story section -->
-<div class="story-panel" id="storyBox">
-    <img src="../story-image.jpg">
-    <div class="story-text">
-        yo see these guys, they left their high paying job which could have been easy retirement and came to try this new evm from scratch, but wait why should you care? because in life these things inspire you. the lore of simp is not about simping for anything, it means simping for what matters to you until you get it. $simp and simp cult nft collection is not just a collection or a token, it’s the future of monad where the builders will get all the tools possible to create what they deserve. building apps and dapps is just one side, building also involves building relationships and that’s the key of all.
+<!-- Hero Section -->
+<section class="hero">
+    <h1>welcome to simp cult</h1>
+</section>
+
+<!-- Story Section -->
+<section id="storySection">
+    <div class="story-card">
+        <img src="story-image.jpg" alt="Story Image">
+        <p>
+            yo, see these guys. they left their high-paying jobs that could’ve given them an easy retirement, and chose to build a new evm from scratch instead.
+            but wait… why should you care? because in life, things like this remind you what real conviction looks like.
+            the lore of simp isn’t about simping for random things. it’s about simping for what truly matters to you until you actually get it.
+            $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of monad, where builders get every tool they need to create what they deserve.
+            and btw, building apps and dapps is just one side of it. building relationships is the real key to everything.
+        </p>
     </div>
-</div>
+
+    <div class="cta">
+        <a href="/checker">check eligibility</a>
+    </div>
+</section>
 
 <script>
-function showStory(){
-    document.getElementById("storyBox").style.display="block";
-    window.scrollTo({top:0,behavior:"smooth"});
-}
+/* Fade Story Section When Reached */
+document.addEventListener("scroll", () => {
+    const story = document.getElementById("storySection");
+    const rect = story.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 150) {
+        story.classList.add("visible");
+    }
+});
 </script>
 
 </body>
