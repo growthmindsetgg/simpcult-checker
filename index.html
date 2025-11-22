@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SIMP Cult</title>
+
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Inter, sans-serif; }
+
+    body {
+        overflow-x: hidden;
+        background: #000;
+        color: white;
+    }
+
+    /* Background Video */
+    #bgVideo {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 130%;
+        height: auto;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+        z-index: -2;
+        opacity: 0.7;
+    }
+
+    /* Dark Overlay */
+    .overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: -1;
+    }
+
+    /* Navbar */
+    nav {
+        position: fixed;
+        top: 25px;
+        right: 40px;
+        z-index: 10;
+    }
+
+    nav a {
+        margin-left: 20px;
+        color: #c9a5ff;
+        text-decoration: none;
+        font-size: 16px;
+        transition: 0.2s;
+        font-weight: 600;
+    }
+
+    nav a:hover {
+        color: #ffffff;
+    }
+
+    /* Center Hero Text */
+    .hero {
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+
+    .hero h1 {
+        font-size: 42px;
+        font-weight: 600;
+        color: #cfa7ff;
+        text-shadow: 0 0 12px rgba(0,0,0,0.6);
+    }
+
+    /* Story Section */
+    #story {
+        min-height: 100vh;
+        padding: 120px 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .story-box {
+        background: rgba(0,0,0,0.55);
+        padding: 40px;
+        border-radius: 18px;
+        max-width: 850px;
+        text-align: center;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    }
+
+    .story-box img {
+        width: 75%;
+        border-radius: 12px;
+        margin-bottom: 25px;
+    }
+
+    .story-box p {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #ddd;
+        margin-bottom: 25px;
+    }
+
+    /* Checker Button */
+    .check-btn {
+        padding: 12px 30px;
+        border-radius: 10px;
+        background: #d9a4ff;
+        color: #000;
+        text-decoration: none;
+        font-size: 16px;
+        font-weight: 600;
+        transition: 0.2s;
+        display: inline-block;
+    }
+
+    .check-btn:hover {
+        background: #b57aff;
+    }
+</style>
+</head>
+
+<body>
+
+<!-- Background Video -->
+<video autoplay muted loop id="bgVideo">
+    <source src="Homepage.mp4" type="video/mp4">
+</video>
+<div class="overlay"></div>
+
+<!-- Navbar -->
+<nav>
+    <a href="/checker">checker</a>
+    <a href="#story">story</a>
+    <a href="https://x.com/monadsimpcult" target="_blank">twitter</a>
+</nav>
+
+<!-- Hero Section -->
+<section id="home" class="hero">
+    <h1>welcome to simp cult</h1>
+</section>
+
+<!-- Story Section -->
+<section id="story">
+    <div class="story-box">
+        <img src="story-image.jpg" alt="story">
+        
+        <p>
+            yo, see these guys. they left their high-paying jobs that could’ve given them an easy retirement, 
+            and chose to build a new evm from scratch instead. but wait… why should you care? because in life, 
+            things like this remind you what real conviction looks like. the lore of simp isn’t about simping 
+            for random things. it’s about simping for what truly matters to you until you actually get it. 
+            $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of monad, 
+            where builders get every tool they need to create what they deserve. and btw, building apps and dapps 
+            is just one side of it. building relationships is the real key to everything.
+        </p>
+
+        <a href="/checker" class="check-btn">check eligibility</a>
+    </div>
+</section>
+
+</body>
+</html>
