@@ -1,217 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Simp Cult</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIMP Cult</title>
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+<!-- Favicon -->
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: black;
-            color: white;
-            font-family: 'Inter', sans-serif;
-            scroll-behavior: smooth;
-        }
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: Inter, sans-serif;
+    }
 
-        /* Navigation / Header */
-        .navbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            padding: 18px 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(6px);
-        }
+    body {
+        background: #000;
+        color: white;
+        overflow-x: hidden;
+    }
 
-        .nav-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+    /* NAVBAR */
+    nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+        gap: 40px;
+        padding: 20px 50px;
+        z-index: 10;
+    }
 
-        .nav-left img {
-            height: 38px;
-            width: 38px;
-        }
+    nav a {
+        color: #c9a8ff;
+        text-decoration: none;
+        font-size: 16px;
+        opacity: 0.85;
+        transition: 0.2s;
+    }
 
-        .nav-links {
-            display: flex;
-            gap: 28px;
-            margin-left: 20px;
-        }
+    nav a:hover {
+        opacity: 1;
+        color: #e3c7ff;
+    }
 
-        .nav-links a {
-            text-decoration: none;
-            color: #c8a8ff;
-            font-size: 15px;
-            letter-spacing: 1px;
-            transition: 0.2s;
-        }
+    /* Hero section */
+    #hero {
+        position: relative;
+        height: 100vh;
+        width: 100vw;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        overflow: hidden;
+    }
 
-        .nav-links a:hover {
-            color: white;
-        }
+    #hero video {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 120%;
+        transform: translate(-50%, -50%);
+        z-index: -1;
+        filter: brightness(0.7);
+    }
 
-        /* Right social icons */
-        .nav-right {
-            display: flex;
-            gap: 14px;
-        }
+    #hero h1 {
+        font-size: 42px;
+        font-weight: 700;
+        color: #d8b4ff;
+        text-shadow: 0 0 20px rgba(0,0,0,0.7);
+        letter-spacing: 1px;
+    }
 
-        .social-btn {
-            height: 35px;
-            width: 35px;
-            border: 1px solid #666;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.2s;
-        }
+    /* STORY SECTION */
+    #story {
+        padding: 120px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 
-        .social-btn:hover {
-            border-color: #c8a8ff;
-            transform: scale(1.08);
-        }
+    #story .box {
+        width: 65%;
+        background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(12px);
+        padding: 40px;
+        border-radius: 18px;
+        line-height: 1.6;
+        color: #ddd;
+        font-size: 15px;
+    }
 
-        /* HERO SECTION */
-        .hero {
-            height: 100vh;
-            width: 100%;
-            background: url('Homepage.mp4') no-repeat center center/cover;
-            position: relative;
-        }
+    #story img {
+        width: 100%;
+        border-radius: 12px;
+        margin-bottom: 25px;
+    }
 
-        /* Video overlay */
-        .hero video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            position: absolute;
-            top: 0;
-            left: 0;
-            filter: brightness(0.4);
-        }
+    #story p {
+        text-align: center;
+        white-space: normal;
+    }
 
-        .hero-title {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 56px;
-            font-weight: 500;
-            color: #d7b4ff;
-            letter-spacing: 1px;
-            text-align: center;
-        }
+    #story button {
+        margin-top: 30px;
+        background: #c07bff;
+        color: #fff;
+        padding: 12px 30px;
+        font-size: 16px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: 0.3s;
+    }
 
-        /* STORY SECTION */
-        #story {
-            width: 100%;
-            padding: 130px 20px;
-            background: radial-gradient(circle at top, #2b1e38, #0c0916 70%);
-            text-align: center;
-        }
-
-        .story-container {
-            max-width: 900px;
-            margin: auto;
-            background: rgba(255,255,255,0.04);
-            padding: 40px;
-            border-radius: 14px;
-        }
-
-        .story-img {
-            width: 330px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-        }
-
-        .story-text {
-            font-size: 16px;
-            line-height: 1.65;
-            color: #d6c9ff;
-            font-weight: 300;
-        }
-
-        /* CHECK BUTTON */
-        .check-btn {
-            margin-top: 38px;
-            padding: 12px 32px;
-            background: #b57bff;
-            color: white;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-size: 17px;
-            transition: 0.2s;
-        }
-
-        .check-btn:hover {
-            background: #d2a8ff;
-            transform: scale(1.05);
-        }
-    </style>
+    #story button:hover {
+        background: #a85ee8;
+    }
+</style>
 </head>
 
 <body>
 
-    <!-- NAVBAR -->
-    <div class="navbar">
-        <div class="nav-left">
-            <img src="iconsimp.png" alt="simp logo" />
-            <div class="nav-links">
-                <a href="/checker.html">checker</a>
-                <a href="#story">story</a>
-            </div>
-        </div>
+<!-- NAVBAR -->
+<nav>
+    <a href="checker.html">checker</a>
+    <a href="#story">story</a>
+    <a href="https://x.com/monadsimpcult" target="_blank">twitter</a>
+    <a href="https://github.com/growthmindsetgg/simpcult-checker" target="_blank">github</a>
+</nav>
 
-        <div class="nav-right">
-            <a href="https://x.com/monadsimpcult" target="_blank">
-                <div class="social-btn">X</div>
-            </a>
+<!-- HERO -->
+<section id="hero">
+    <video autoplay loop muted playsinline>
+        <source src="Homepage.mp4" type="video/mp4">
+    </video>
 
-            <a href="https://github.com/growthmindsetgg/simpcult-checker" target="_blank">
-                <div class="social-btn">G</div>
-            </a>
-        </div>
+    <h1>welcome to simp cult</h1>
+</section>
+
+<!-- STORY SECTION -->
+<section id="story">
+    <div class="box">
+        <img src="story-image.jpg" alt="story">
+
+        <p>
+yo, see these guys. they left their high-paying jobs that could've given them an easy retirement, and chose to build a new evm from scratch instead. but wait… why should you care? because in life, things like this remind you what real conviction looks like. the lore of simp isn’t about simping for random things. it’s about simping for what truly matters to you until you actually get it. $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of monad, where builders get every tool they need to create what they deserve. and btw, building apps and dapps is just one side of it. building relationships is the real key to everything.
+        </p>
+
+        <button onclick="window.location.href='checker.html'">
+            check eligibility
+        </button>
     </div>
-
-    <!-- HERO -->
-    <section class="hero">
-        <video autoplay muted loop>
-            <source src="Homepage.mp4" type="video/mp4" />
-        </video>
-
-        <div class="hero-title">welcome to simp cult</div>
-    </section>
-
-    <!-- STORY SECTION -->
-    <section id="story">
-        <div class="story-container">
-            <img src="story-image.jpg" class="story-img" alt="story visual">
-
-            <p class="story-text">
-                yo, see these guys. they left their high-paying jobs that could've given them an easy retirement, and chose to build a new evm from scratch instead. but wait… why should you care? because in life, things like this remind you what real conviction looks like. the lore of simp isn’t about simping for random things. it’s about simping for what truly matters to you until you actually get it.
-                <br><br>
-                $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of monad, where builders get every tool they need to create what they deserve. and btw, building apps and dapps is just one side of it. building relationships is the real key to everything.
-            </p>
-
-            <a href="/checker.html">
-                <button class="check-btn">check eligibility</button>
-            </a>
-        </div>
-    </section>
+</section>
 
 </body>
 </html>
