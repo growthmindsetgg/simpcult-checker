@@ -2,133 +2,120 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIMP Cult</title>
-
-<!-- Favicon -->
-<link rel="icon" type="image/x-icon" href="favicon.ico">
-<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/x-icon" href="simp.ico">
 
 <style>
     * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        font-family: Inter, sans-serif;
+        font-family: 'Inter', sans-serif;
     }
 
     body {
-        background: #000;
-        color: white;
+        background: #0d0b16;
+        color: #d6cfff;
         overflow-x: hidden;
     }
 
-    /* NAVBAR */
+    /* NAVIGATION */
     nav {
-        position: fixed;
-        top: 0;
         width: 100%;
+        padding: 22px 60px;
         display: flex;
         justify-content: flex-end;
-        gap: 40px;
-        padding: 20px 50px;
-        z-index: 10;
+        align-items: center;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 999;
+        background: rgba(13, 11, 22, 0.55);
+        backdrop-filter: blur(12px);
     }
 
     nav a {
-        color: #c9a8ff;
+        margin-left: 32px;
         text-decoration: none;
-        font-size: 16px;
-        opacity: 0.85;
-        transition: 0.2s;
+        font-size: 15px;
+        color: #c7a8ff;
+        transition: 0.2s ease-in-out;
     }
 
     nav a:hover {
-        opacity: 1;
-        color: #e3c7ff;
+        color: white;
     }
 
-    /* Hero section */
-    #hero {
-        position: relative;
+    /* HERO SECTION */
+    .hero {
         height: 100vh;
-        width: 100vw;
         display: flex;
         justify-content: center;
         align-items: center;
         text-align: center;
-        overflow: hidden;
+        padding-top: 60px;
+        background: url("Homepage.mp4");
     }
 
-    #hero video {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 120%;
-        transform: translate(-50%, -50%);
-        z-index: -1;
-        filter: brightness(0.7);
-    }
-
-    #hero h1 {
-        font-size: 42px;
-        font-weight: 700;
-        color: #d8b4ff;
-        text-shadow: 0 0 20px rgba(0,0,0,0.7);
-        letter-spacing: 1px;
+    .hero-title {
+        font-size: 52px;
+        font-weight: 600;
+        color: #cfaeff;
+        letter-spacing: 2px;
     }
 
     /* STORY SECTION */
-    #story {
-        padding: 120px 20px;
+    .story {
+        width: 100%;
+        padding: 120px 0;
         display: flex;
         flex-direction: column;
         align-items: center;
     }
 
-    #story .box {
-        width: 65%;
-        background: rgba(0,0,0,0.4);
-        backdrop-filter: blur(12px);
+    /* FIXED CLEAN IMAGE */
+    .story img {
+        width: 380px;
+        height: auto;
+        border-radius: 14px;
+        object-fit: contain;
+        display: block;
+        margin-bottom: 40px;
+    }
+
+    .story-box {
+        width: 60%;
+        background: rgba(255, 255, 255, 0.06);
         padding: 40px;
-        border-radius: 18px;
+        border-radius: 16px;
         line-height: 1.6;
-        color: #ddd;
         font-size: 15px;
-    }
-
-    #story img {
-        width: 100%;
-        border-radius: 12px;
-        margin-bottom: 25px;
-    }
-
-    #story p {
+        color: #ddd1ff;
         text-align: center;
-        white-space: normal;
+        backdrop-filter: blur(8px);
     }
 
-    #story button {
-        margin-top: 30px;
-        background: #c07bff;
-        color: #fff;
-        padding: 12px 30px;
-        font-size: 16px;
+    .btn-check {
+        margin-top: 40px;
+        padding: 12px 26px;
         border: none;
-        border-radius: 12px;
+        border-radius: 10px;
+        background: #be8aff;
+        color: white;
+        font-size: 16px;
         cursor: pointer;
-        transition: 0.3s;
+        transition: 0.2s ease-in-out;
     }
 
-    #story button:hover {
-        background: #a85ee8;
+    .btn-check:hover {
+        background: #d3a4ff;
     }
 </style>
 </head>
 
 <body>
 
-<!-- NAVBAR -->
+<!-- NAVIGATION -->
 <nav>
     <a href="checker.html">checker</a>
     <a href="#story">story</a>
@@ -137,27 +124,29 @@
 </nav>
 
 <!-- HERO -->
-<section id="hero">
-    <video autoplay loop muted playsinline>
-        <source src="Homepage.mp4" type="video/mp4">
-    </video>
-
-    <h1>welcome to simp cult</h1>
+<section class="hero">
+    <div class="hero-title">welcome to simp cult</div>
 </section>
 
 <!-- STORY SECTION -->
-<section id="story">
-    <div class="box">
-        <img src="story-image.jpg" alt="story">
+<section id="story" class="story">
 
-        <p>
-yo, see these guys. they left their high-paying jobs that could've given them an easy retirement, and chose to build a new evm from scratch instead. but wait… why should you care? because in life, things like this remind you what real conviction looks like. the lore of simp isn’t about simping for random things. it’s about simping for what truly matters to you until you actually get it. $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of monad, where builders get every tool they need to create what they deserve. and btw, building apps and dapps is just one side of it. building relationships is the real key to everything.
-        </p>
+    <img src="story-image.jpg" alt="Story Image">
 
-        <button onclick="window.location.href='checker.html'">
-            check eligibility
-        </button>
+    <div class="story-box">
+        yo, see these guys. they left their high-paying jobs that could’ve given them an easy retirement, 
+        and chose to build a new evm from scratch instead. but wait… why should you care? because in life, 
+        things like this remind you what real conviction looks like. the lore of simp isn’t about simping 
+        for random things. it’s about simping for what truly matters to you until you actually get it. 
+        $simp and the simp cult nft collection aren’t just a collection or a token. they’re the future of 
+        monad, where builders get every tool they need to create what they deserve. and btw, building apps 
+        and dapps is just one side of it. building relationships is the real key to everything.
     </div>
+
+    <a href="checker.html">
+        <button class="btn-check">check eligibility</button>
+    </a>
+
 </section>
 
 </body>
