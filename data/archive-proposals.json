@@ -1,0 +1,15 @@
+[
+  {
+    "id": "archive-example",
+    "title": "example — replace me with your past votes",
+    "description": "this is the archive of votes held before the on-chain dao. edit data/archive-proposals.json: one object per past vote. fields: id, title, description, date (yyyy-mm-dd), source (where it was held, e.g. discord/telegram/x poll), link (optional), options: [{label, votes}], result (text).",
+    "date": "2026-01-01",
+    "source": "telegram poll",
+    "link": "",
+    "options": [
+      { "label": "yes", "votes": 42 },
+      { "label": "no", "votes": 7 }
+    ],
+    "result": "passed"
+  }
+]
