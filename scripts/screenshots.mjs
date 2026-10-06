@@ -9,10 +9,8 @@ import { join } from "node:path";
 const BASE = process.env.SIMP_BASE ?? "http://localhost:3000";
 const PAGES = [
   { path: "/", name: "home" },
-  { path: "/checker", name: "checker" },
+  { path: "/join", name: "join" },
   { path: "/dao", name: "dao" },
-  { path: "/verify", name: "verify" },
-  { path: "/security", name: "security" },
 ];
 const VIEWPORTS = [
   { w: 1440, h: 900, tag: "1440" },

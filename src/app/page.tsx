@@ -7,7 +7,7 @@ import { useMotionValue, useScroll, useSpring, useTransform, useReducedMotion } 
 import { VideoBg } from "@/components/VideoBg";
 import { Icon } from "@/components/Icon";
 import { Reveal, Stagger, Item, SplitWords, Spotlight, motion } from "@/components/motion";
-import { RotatingBadge, PillButton } from "@/components/Liquid";
+import { PillButton } from "@/components/Liquid";
 import { NeonMuse } from "@/components/NeonMuse";
 import { LINKS } from "@/lib/config";
 
@@ -51,27 +51,26 @@ export default function Home() {
             <Item><p className="t-body">and btw, building apps and dapps is just one side of it. <span className="text-text">building relationships is the real key to everything.</span></p></Item>
             <Item>
               <div className="pt-2">
-                <Link href="/checker" className="pillbtn pillbtn-light" aria-label="check eligibility"><span className="pillbtn-label">check eligibility</span><span className="pillbtn-disc">↗</span></Link>
+                <Link href="/join" className="pillbtn pillbtn-light" aria-label="join the cult"><span className="pillbtn-label">join the cult</span><span className="pillbtn-disc">↗</span></Link>
               </div>
             </Item>
           </Stagger>
         </div>
       </section>
 
-      {/* ── three doors ──────────────────────────────────────── */}
+      {/* ── two doors ────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-bg px-6 py-32 md:px-8 md:py-44">
         <div className="divider absolute inset-x-0 top-0" />
         <span className="ghost">doors</span>
         <div className="relative mx-auto max-w-6xl">
           <Reveal className="mb-14 max-w-xl">
             <p className="t-wide-sm mb-4">for the cult</p>
-            <h2 className="t-h1 text-[clamp(30px,4.2vw,52px)]">three doors. all need a simp.</h2>
+            <h2 className="t-h1 text-[clamp(30px,4.2vw,52px)]">two doors. both need a simp.</h2>
           </Reveal>
 
-          <Stagger className="grid gap-5 md:grid-cols-3">
-            <Card href="/checker" n="01" title="wl checker" body="see whether an address made the gtd or fcfs list." cta="check" />
+          <Stagger className="grid gap-5 md:grid-cols-2">
+            <Card href="/join" n="01" title="join the cult" body="prove you hold a simp and get into the private telegram." cta="verify" />
             <Card href="/dao" n="02" title="simp dao" body="holders open proposals and vote on-chain. one nft, one vote, no take-backs." cta="proposals" />
-            <Card href="/verify" n="03" title="holders only" body="prove you hold a simp and get into the private telegram." cta="verify" />
           </Stagger>
 
           {/* neon banner */}
@@ -207,10 +206,6 @@ function Hero() {
             <a href={LINKS.opensea} target="_blank" rel="noreferrer" className="social" aria-label="opensea"><Icon name="opensea" className="h-4 w-4" /></a>
             <a href={LINKS.github} target="_blank" rel="noreferrer" className="social" aria-label="github"><Icon name="external" className="h-3.5 w-3.5" /></a>
             {LINKS.telegramBot && <a href={LINKS.telegramBot} target="_blank" rel="noreferrer" className="social" aria-label="telegram"><Icon name="telegram" className="h-4 w-4" /></a>}
-          </div>
-          <RotatingBadge />
-          <div className="invisible flex items-center gap-3 text-xs text-mute md:visible">
-            <span className="mono">monad · 143</span>
           </div>
         </motion.div>
       </div>

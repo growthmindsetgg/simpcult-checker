@@ -25,7 +25,6 @@ export function Footer() {
             <li><a className="link" href={LINKS.opensea} target="_blank" rel="noreferrer">opensea collection</a></li>
             <li><a className="link" href={LINKS.x} target="_blank" rel="noreferrer">@monadsimpcult on x</a></li>
             <li><a className="link" href={LINKS.github} target="_blank" rel="noreferrer">github</a></li>
-            <li><a className="link" href="/security">security</a></li>
           </ul>
         </div>
 

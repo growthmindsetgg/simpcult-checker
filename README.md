@@ -1,41 +1,50 @@
 # simp cult — simpcult.xyz
 
-Next.js 16 site for the Monad Simp Cult NFT: story + WL checker, secure wallet
-verification, fully on-chain DAO, and a Telegram holder gate.
+Next.js 16 site for the Monad Simp Cult NFT: lore, fully on-chain DAO, and a
+single gateway (`/join`) that proves wallet ownership and binds a telegram
+account to the holders-only group.
 
 ```
 src/app/            pages + API routes (app router)
+  /                 home (hero · story · two doors)
+  /join             4-step gateway (connect · prove · bind telegram · done)
+  /dao              proposals + voting
+  /api/join/*       self-tx challenge + confirm
+  /api/auth/*       SIWE + nonce + session
+  /api/telegram/*   bot webhook + /link
+  /api/cron/recheck hourly holder re-check
 src/components/     nav, footer, wallet modal, dao cards, Toast, GlobalRipple
 src/lib/            config, wagmi, dao hooks, session hooks
 src/lib/server/     chain client, kv store, sessions, telegram bot (server only)
 contracts/          Foundry project — SimpDAO.sol + tests + deploy script
-data/               whitelist.json (checker), archive-proposals.json (old votes)
-public/media/       videos + story image
 ```
 
-## interaction polish (v2)
+## the gateway (`/join`)
 
-- **Nav** — subtle magnetic hover + a 1px animated underline on the active
-  route (`.nav-link`, gated by `prefers-reduced-motion`).
-- **Cards** — `Spotlight` now also tracks pointer position to add a max 6°
-  3D tilt via CSS vars (`--rx`, `--ry`, `--tz`) written into a `.tilt` shell.
-- **Buttons** — a global `<GlobalRipple />` in the layout delegates a press
-  ripple to any `.pillbtn` or `.btn-primary`; no per-button wiring.
-- **Toast store** — dep-free singleton in `src/components/Toast.tsx` backed by
-  `useSyncExternalStore`. Import `toast` and call `toast.ok / .info / .bad /
-  .warn`. Bottom-right glass toasts, auto-dismiss.
-- **Checker** — result card springs in, includes a copy-address button and,
-  when eligible, a shareable X-intent link.
-- **DAO** — vote bars animate from 0 on reveal (IntersectionObserver). Voting
-  shows a pending pill + optimistic bar bump until the tx mines; toasts fire on
-  send / mined / failed.
-- **Wallet modal** — a connect → verify step indicator up top; a spring
-  checkmark icon animates in on first entry to the verified view.
-- **Verify** — the active step glows via `.pulse-neon`; a vertical `.step-track`
-  fills its height as steps complete.
-- **Home** — a soft cursor-following glow sits behind the neon muse; scroll
-  drives a slower parallax so the muse drifts behind page content.
-- All motion primitives respect `prefers-reduced-motion`.
+`/verify` and `/security` 301-redirect to `/join`; `/checker` 301-redirects to
+`/`. Four accordion cards — only the active one is expanded:
+
+1. **connect wallet** — any EIP-6963 injected wallet or WalletConnect.
+2. **prove it's yours** — default is a **self-transaction**: the server issues
+   a unique random amount between `0.001` and `0.003` MON (6 random decimal
+   digits, e.g. `0.001734 MON`), stored in Upstash under the lowercase address
+   for 15 minutes. The user sends that exact amount from their wallet to
+   itself; the server verifies `from == to == address`, `value == amountWei`,
+   `status == success`, and the block timestamp is within the 15-min window.
+   A small "sign a message instead (free)" link exposes the existing SIWE
+   flow for wallets that don't want to pay gas. The server always re-reads
+   the NFT balance from chain; `<1` returns a clear message with an OpenSea
+   link.
+3. **bind telegram** — holder types their `@username` (5–32 chars, letters/
+   digits/underscore). The one-time code is stored with that handle; the bot
+   only accepts the handshake from the matching `ctx.from.username`
+   (case-insensitive). Mismatch → `"this code was bound to @X — verify again
+   from the site with your current username"` and no invite.
+4. **done** — "check telegram for your invite" + one-liner about `/status`
+   and `/unlink`.
+
+Existing re-check / kick / one-wallet-one-account logic is preserved
+(`src/lib/server/telegram.ts`).
 
 ## 1. run locally
 
@@ -45,14 +54,35 @@ cp .env.example .env.local     # fill at least SESSION_SECRET
 npm run dev                    # http://localhost:3000
 ```
 
-Without Upstash env vars the app uses an in-memory store — fine for local dev,
-NOT for Vercel (nonces / telegram links would not persist between requests).
+Without Upstash env vars the app falls back to an in-memory store — fine for
+local dev, NOT for Vercel: challenge amounts and telegram codes would not
+persist between requests.
 
-## 2. deploy the DAO contract (Monad mainnet, chain 143)
+## 2. environment variables
+
+Public (safe, build-time baked):
+
+- `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SITE_DOMAIN`
+- `NEXT_PUBLIC_MONAD_RPC`
+- `NEXT_PUBLIC_NFT_ADDRESS` (ERC-721, Monad Simp Cult)
+- `NEXT_PUBLIC_DAO_ADDRESS` (after `forge script` deploy)
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (optional — enables QR / mobile)
+- `NEXT_PUBLIC_TELEGRAM_BOT` (bot username without `@`)
+
+Server-only (secrets):
+
+- `SESSION_SECRET` — `openssl rand -hex 32` (≥32 chars; required in prod)
+- `MONAD_RPC` — private RPC for server reads (optional)
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — **required in prod**;
+  storage for the self-tx challenges and telegram link codes
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_GROUP_ID`, `TELEGRAM_WEBHOOK_SECRET`
+- `CRON_SECRET` — matches `vercel.json`'s daily cron auth
+
+## 3. deploy the DAO contract (Monad mainnet, chain 143)
 
 ```bash
 cd contracts
-forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts --no-git   # lib/ is not committed
+forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts --no-git
 forge test                     # 12 tests
 
 NFT=0xd8830709f8527033e03f44217ad093624997e60f \
@@ -60,74 +90,61 @@ OWNER=<your wallet or multisig> QUORUM=20 PERIOD=259200 COOLDOWN=86400 \
 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --private-key $PK
 ```
 
-Copy the printed address into `NEXT_PUBLIC_DAO_ADDRESS`. Verify the source on
-monadvision/monadscan so voters can read it. Parameters (all changeable later by
-the owner via `setConfig`): `proposalThreshold` NFTs needed to propose, `quorum`
-total votes needed, `votingDelay`, `votingPeriod`, `proposalCooldown` per wallet.
+Paste the printed address into `NEXT_PUBLIC_DAO_ADDRESS` and verify the source
+on monadvision/monadscan. 1 NFT = 1 vote, cast **per tokenId**; a token can't
+vote twice on the same proposal even if sold mid-vote.
 
-How voting works: 1 NFT = 1 vote, cast **per tokenId** — a token can never vote
-twice on the same proposal even if it is sold mid-vote. Choices: for / against /
-abstain. Result = for > against and total ≥ quorum. Proposer or owner can cancel
-before the end; nobody can edit a tally.
+## 4. deploy the site on Vercel
 
-## 3. deploy the site on Vercel
+1. Push to GitHub, import in Vercel (framework: Next.js).
+2. Vercel → Storage / Marketplace → **Upstash Redis** → connect. If the CLI
+   `vercel integration add upstash` won't open the browser, do it in the
+   dashboard: *Project → Storage → Create → Upstash Redis → Connect*. Vercel
+   injects `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+   automatically.
+3. Add the rest of `.env.example` as environment variables. `NEXT_PUBLIC_*`
+   are baked at **build** time — redeploy after changes.
+4. Domain: add `simpcult.xyz` and point DNS.
+5. `vercel.json` schedules `/api/cron/recheck` daily on the Hobby plan.
 
-1. Push this folder to GitHub, import in Vercel (framework: Next.js).
-2. Vercel → Storage / Marketplace → **Upstash Redis** → connect; it injects
-   `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
-3. Add the rest of `.env.example` as environment variables. `NEXT_PUBLIC_*` vars
-   are baked in at **build** time — redeploy after changing them.
-   `SESSION_SECRET`: `openssl rand -hex 32`. `CRON_SECRET`: same.
-4. Domain: add `simpcult.xyz` in Vercel and point DNS there (replace the GitHub
-   Pages CNAME).
-5. `vercel.json` schedules `/api/cron/recheck` hourly (Telegram re-check).
-
-## 4. telegram holder gate
+## 5. telegram holder gate
 
 1. @BotFather → `/newbot` → token → `TELEGRAM_BOT_TOKEN`; username →
-   `NEXT_PUBLIC_TELEGRAM_BOT` (without @).
-2. Make the group private, add the bot as **admin** with *invite users via link*
-   and *ban users* rights. Get the chat id (e.g. add @RawDataBot, or forward a
-   message to @userinfobot) → `TELEGRAM_GROUP_ID` (looks like `-100…`).
+   `NEXT_PUBLIC_TELEGRAM_BOT` (without `@`).
+2. Make the group private, add the bot as **admin** with *invite users via
+   link* and *ban users* rights. Get the chat id → `TELEGRAM_GROUP_ID`
+   (`-100…`).
 3. `TELEGRAM_WEBHOOK_SECRET`: random string. Register the webhook once:
    ```
    https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://simpcult.xyz/api/telegram/webhook&secret_token=<SECRET>&allowed_updates=%5B%22message%22%2C%22chat_member%22%5D
    ```
-4. Flow: holder verifies on `/verify` → "join telegram" → bot re-checks balance
-   on-chain → single-use invite link (10 min). Bot commands: `/status`, `/unlink`.
-   Hourly cron kicks wallets that no longer hold. Anyone who sneaks in via
-   another link is removed on the `chat_member` update unless linked + holding.
+4. Flow: holder completes steps 1–2 on `/join`, types their `@username` in
+   step 3, bot checks `ctx.from.username` matches the stored handle, re-reads
+   NFT balance on-chain, hands out a single-use invite (10 min). Bot
+   commands: `/status`, `/unlink`. Cron kicks non-holders. Anyone sneaking in
+   via another link is removed on the `chat_member` update unless linked +
+   holding.
 
-## 5. wallet security model (see /security on the site)
+## 6. wallet security model (summary — full version is in `/join` → "how this stays safe")
 
-- One chain configured (Monad 143). Connectors: EIP-6963 injected wallets +
-  WalletConnect (only if `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is set).
-- Verification = Sign-In With Ethereum (EIP-4361): domain-bound, chain-bound,
-  single-use server nonce (5 min TTL, consumed atomically). Smart wallets
-  supported via ERC-1271/6492.
-- Fallback = 0-MON self-transaction with the nonce in calldata (for wallets that
-  cannot sign messages). Server checks from == to, value 0, calldata, mined,
-  < 30 min old.
-- The site never requests approvals. The only writes are DAO `propose` /
-  `castVote` / `cancel` and the optional self-tx.
-- Strict CSP + security headers in `next.config.ts`. Sessions are HMAC-signed
-  httpOnly cookies; holder status is re-read from chain for every gated action.
-- **Pocket Universe**: it is a browser extension users install themselves; there
-  is no API a site can integrate. Its published chain list did not include Monad
-  at time of writing, so the site is built to be safe without it, and recommends
-  it (and wallets with built-in simulation like Rabby) as an extra layer.
+- One chain (Monad 143). Connectors: EIP-6963 injected + WalletConnect
+  (gated by `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`).
+- Verification = SIWE (EIP-4361) **or** a self-transaction with a server-
+  issued random MON amount. The site never requests approvals.
+- Sessions are HMAC-signed httpOnly cookies; holder status is re-read from
+  chain for every gated action.
+- Strict CSP + security headers in `next.config.ts`.
 
-## 6. content you maintain
+## 7. content you maintain
 
-- `data/whitelist.json` — the WL checker list (`{ "0x…": { gtd, fcfs } }`).
-- `data/archive-proposals.json` — old (pre-DAO) votes shown under DAO → archive.
-  Delete the example entry and add one object per past vote.
+- `data/archive-proposals.json` — pre-DAO votes shown under DAO → archive.
 - `src/lib/config.ts` — links, team credits, addresses (env overrides).
-- `public/media/` — Homepage.mp4 (home bg), lambedesign.mp4 (checker bg).
+- `public/media/` — `Homepage.mp4` (home background), `story-image.jpg`.
 
 ## scripts
 
 ```
 npm run dev / build / start / lint
+node scripts/screenshots.mjs       # desktop + mobile smoke shots
 cd contracts && forge test
 ```

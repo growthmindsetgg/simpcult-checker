@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["grammy"],
+  async redirects() {
+    return [
+      { source: "/verify", destination: "/join", statusCode: 301 },
+      { source: "/security", destination: "/join", statusCode: 301 },
+      { source: "/checker", destination: "/", statusCode: 301 },
+    ];
+  },
   async headers() {
     return [
       {

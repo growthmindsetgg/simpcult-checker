@@ -15,9 +15,8 @@ function subscribeScroll(cb: () => void) {
 
 const items = [
   { href: "/", label: "home" },
-  { href: "/checker", label: "checker" },
+  { href: "/join", label: "join" },
   { href: "/dao", label: "dao" },
-  { href: "/verify", label: "holders" },
 ];
 
 export function Nav() {

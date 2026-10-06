@@ -50,3 +50,6 @@ contracts/lib/
 /Claude outputs/
 /screenshots/
 /.claude/
+
+.vercel
+.env*

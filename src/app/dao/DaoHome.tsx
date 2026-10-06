@@ -87,7 +87,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
 
       <NewProposal open={creating} onClose={() => setCreating(false)} />
       <p className="mt-12 text-[13px] text-mute">
-        need to verify first? open the wallet menu and sign in. <Link href="/security" className="link">how voting stays safe →</Link>
+        need to verify first? open the wallet menu and sign in — or go to <Link href="/join" className="link">/join</Link>.
       </p>
     </section>
   );

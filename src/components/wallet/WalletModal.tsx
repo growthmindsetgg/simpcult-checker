@@ -234,7 +234,7 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
           )}
           <div className="grid grid-cols-2 gap-2">
             <Link href="/dao" onClick={onClose} className="btn btn-primary">dao</Link>
-            <Link href="/verify" onClick={onClose} className="btn btn-ghost">telegram</Link>
+            <Link href="/join" onClick={onClose} className="btn btn-ghost">telegram</Link>
           </div>
           <div className="flex justify-between text-xs text-mute">
             <button className="hover:text-white" onClick={() => logout.mutate()}>sign out</button>
@@ -297,7 +297,7 @@ function SecurityNote() {
       <span>
         we never request token approvals. if a wallet prompt ever asks for <em>setApprovalForAll</em> or a
         different chain, reject it — it isn&apos;t us. run a simulation extension like pocket universe for an extra
-        layer. <Link href="/security" className="link">how we keep this safe →</Link>
+        layer.
       </span>
     </p>
   );

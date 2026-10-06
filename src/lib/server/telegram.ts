@@ -9,7 +9,7 @@ import { LINKS, SITE } from "@/lib/config";
  * Telegram holder gate.
  *
  * Flow
- *  1. verified holder clicks "join telegram" on /verify → POST /api/telegram/link
+ *  1. verified holder submits their @username on /join → POST /api/telegram/link
  *     issues a short code bound to their address (10 min).
  *  2. they open t.me/<bot>?start=<code>. the bot resolves code → address,
  *     re-checks NFT balance on-chain, links tgId ⇄ address (1:1) and replies
@@ -39,9 +39,9 @@ const K = {
 
 export type Link = { address: Address; username?: string; linkedAt: number; tgId: number };
 
-export async function issueCode(address: Address): Promise<string> {
+export async function issueCode(address: Address, username: string): Promise<string> {
   const code = crypto.randomUUID().replace(/-/g, "").slice(0, 20);
-  await kv().set(K.code(code), { address: getAddress(address) }, 600);
+  await kv().set(K.code(code), { address: getAddress(address), username }, 600);
   return code;
 }
 
@@ -75,17 +75,30 @@ function registerHandlers(b: Bot) {
 
     if (!code) {
       await ctx.reply(
-        `gm. this bot gates the holders-only simp cult group.\n\nverify your wallet at ${SITE.url}/verify and tap "join telegram" — you'll come back here with a one-time code.`,
+        `gm. this bot gates the holders-only simp cult group.\n\nverify your wallet at ${SITE.url}/join and tap "open telegram" — you'll come back here with a one-time code.`,
       );
       return;
     }
 
-    const c = await kv().take<{ address: Address }>(K.code(code));
+    const c = await kv().take<{ address: Address; username?: string }>(K.code(code));
     if (!c) {
       await ctx.reply("that code is expired or already used. go back to the site and tap join again.");
       return;
     }
     const address = getAddress(c.address);
+
+    // username match: the code was issued to a specific @handle on the site —
+    // only that handle (case-insensitive) can redeem it.
+    if (c.username) {
+      const current = (from.username ?? "").toLowerCase();
+      const expected = c.username.toLowerCase();
+      if (!current || current !== expected) {
+        await ctx.reply(
+          `this code was bound to @${c.username} — verify again from the site with your current username.`,
+        );
+        return;
+      }
+    }
 
     // live check — never trust anything cached
     const bal = await nftBalance(address).catch(() => 0);
@@ -130,7 +143,7 @@ function registerHandlers(b: Bot) {
 
   b.command("status", async (ctx) => {
     const l = await kv().get<Link>(K.user(ctx.from!.id));
-    if (!l) return ctx.reply("not linked. verify at " + SITE.url + "/verify");
+    if (!l) return ctx.reply("not linked. verify at " + SITE.url + "/join");
     const bal = await nftBalance(l.address).catch(() => 0);
     return ctx.reply(`linked to ${l.address}\nholding ${bal} simp — ${bal > 0 ? "you're good" : "not a holder anymore; you'll be removed on the next check"}`);
   });
