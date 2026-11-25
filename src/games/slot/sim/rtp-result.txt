@@ -1,0 +1,40 @@
+SIMP MACHINE · RTP report
+generated 2026-11-24T17:32:27.280Z
+
+layout     3 reels x 3 rows, 5 paylines, 64-stop strips
+bets       10 / 25 / 50 / 100 / 250 / 500 / 1000 points (min 10, max 1000)
+strips     reel 1: heart 13, rose 10, chog 6, molandak 6, moyaki 6, founder-1 4, founder-2 4, founder-3 4, monad 3, wild 4, scatter 4
+           reel 2: heart 13, rose 10, chog 6, molandak 6, moyaki 6, founder-1 4, founder-2 4, founder-3 4, monad 3, wild 4, scatter 4
+           reel 3: heart 14, rose 11, chog 6, molandak 6, moyaki 6, founder-1 4, founder-2 4, founder-3 4, monad 3, wild 2, scatter 4
+
+── exact (all 262,144 outcomes, 930 ms) ──
+RTP                96.0953%
+house edge         3.9047%
+published RTP      96.1% (config.TARGET_RTP)
+hit rate           39.76% of spins return something
+std dev per spin   2.626x bet
+max win            60x bet
+win size mix       <1x: 8.615%  1x-10x: 29.595%  10x-40x: 1.482%  >=40x: 0.064%
+
+RTP contribution by rule
+  3 SIMP              250x line   3.052%
+  3 Monad             100x line   8.125%
+  3 Founder I          40x line   5.371%
+  3 Founder II         40x line   5.371%
+  3 Founder III        40x line   5.371%
+  3 Chog               15x line   4.395%
+  3 Molandak           15x line   4.395%
+  3 Moyaki             15x line   4.395%
+  Any 3 founders       10x line   9.521%
+  3 Roses               8x line   7.678%
+  3 Hearts              5x line   8.759%
+  Any 3 mascots         4x line   11.206%
+  Love letters       2:1x 3:15x bet   18.457%
+
+── simulated (1,000,000 spins via HMAC-SHA256, 29.8 s) ──
+points played      100,000,000
+points returned    96,070,060
+RTP                96.0701%
+hit rate           39.69%
+99.9% band         95.231% .. 96.959%
+verdict            PASS: simulation agrees with the exact RTP

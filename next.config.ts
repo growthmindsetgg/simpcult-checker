@@ -21,6 +21,9 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Lets parallel dev sessions in one checkout use separate build dirs
+  // (e.g. NEXT_DIST_DIR=.next-site). Defaults to .next.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
   poweredByHeader: false,
   serverExternalPackages: ["grammy"],

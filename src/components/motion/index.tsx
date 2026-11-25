@@ -1,17 +1,17 @@
 "use client";
 
 import { motion, useMotionValue, useSpring, useScroll, useReducedMotion, AnimatePresence, type Variants } from "motion/react";
-import { useCallback, useRef, type CSSProperties, type ReactNode, type MouseEvent, type ComponentProps } from "react";
+import { useCallback, useEffect, useRef, type CSSProperties, type ReactNode, type MouseEvent, type ComponentProps } from "react";
 
 export { motion, AnimatePresence };
 
-const EASE = [0.22, 1, 0.36, 1] as const;
+const EASE = [0.23, 1, 0.32, 1] as const;
 
 /* ── scroll reveal ─────────────────────────────────────────────── */
 export function Reveal({
   children,
   delay = 0,
-  y = 22,
+  y = 14,
   className,
   once = true,
   as = "div",
@@ -28,10 +28,10 @@ export function Reveal({
   return (
     <Tag
       className={className}
-      initial={{ opacity: 0, y, filter: "blur(6px)" }}
-      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      viewport={{ once, margin: "0px 0px -10% 0px" }}
-      transition={{ duration: 0.8, ease: EASE, delay }}
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once, margin: "0px 0px -8% 0px" }}
+      transition={{ duration: 0.6, ease: EASE, delay }}
     >
       {children}
     </Tag>
@@ -41,11 +41,11 @@ export function Reveal({
 /* ── stagger container + items ────────────────────────────────── */
 export const stagger: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
 };
 export const item: Variants = {
-  hidden: { opacity: 0, y: 18, filter: "blur(6px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: EASE } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE } },
 };
 export function Stagger({ children, className, ...rest }: { children: ReactNode; className?: string } & ComponentProps<typeof motion.div>) {
   return (
@@ -225,11 +225,20 @@ export function Ripple({ children, className = "" }: { children: ReactNode; clas
 
 /* ── modal shell with spring ──────────────────────────────────── */
 export function ModalShell({ open, onClose, children, className = "max-w-md" }: { open: boolean; onClose: () => void; children: ReactNode; className?: string }) {
+  // close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-[rgba(8,2,10,0.66)] p-4 backdrop-blur-md"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -237,11 +246,11 @@ export function ModalShell({ open, onClose, children, className = "max-w-md" }: 
           onClick={onClose}
         >
           <motion.div
-            className={`glass w-full p-6 md:p-7 ${className}`}
+            className={`glass max-h-[calc(100dvh-2rem)] w-full overflow-y-auto !rounded-[24px] !bg-bg-2/95 p-6 md:p-7 ${className}`}
             role="dialog"
-            aria-modal
+            aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}

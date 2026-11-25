@@ -1,17 +1,7 @@
-"use client";
-
-import { motion } from "motion/react";
-
-/** page transition: soft fade + rise on every route change */
+/**
+ * page transition: a short CSS fade + rise on every route change.
+ * CSS (not JS) so server-rendered content shows even before hydration.
+ */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-1 flex-col"
-    >
-      {children}
-    </motion.div>
-  );
+  return <div className="page-enter flex flex-1 flex-col">{children}</div>;
 }

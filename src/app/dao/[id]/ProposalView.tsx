@@ -34,7 +34,7 @@ export function ProposalView({ id }: { id: number }) {
   const s = deriveState(p, quorum);
   return (
     <Wrap>
-      <Link href="/dao" className="text-xs text-mute hover:text-white">← all proposals</Link>
+      <Link href="/dao" className="link text-[13px]">← all proposals</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs text-mute">
@@ -232,7 +232,7 @@ function VotePanel({
 
 function Wrap({ children }: { children: React.ReactNode }) {
   return (
-    <section className="mx-auto w-full max-w-5xl px-5 pb-32 pt-36">
+    <section className="page max-w-5xl">
       <Reveal>{children}</Reveal>
     </section>
   );

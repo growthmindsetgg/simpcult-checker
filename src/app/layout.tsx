@@ -24,14 +24,17 @@ const inter = localFont({
   weight: "100 900",
 });
 
+const NAME = "simp machine";
+const DESCRIPTION = "be an active simp, stack SIMP Points, feed them to the machine. the simp cult on monad.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
-  title: { default: SITE.name, template: `%s · ${SITE.name}` },
-  description: SITE.description,
+  title: { default: `${NAME} · ${SITE.name}`, template: `%s · ${NAME}` },
+  description: DESCRIPTION,
   icons: { icon: "/favicon.ico" },
   openGraph: {
-    title: SITE.name,
-    description: SITE.description,
+    title: NAME,
+    description: DESCRIPTION,
     url: SITE.url,
     siteName: SITE.name,
     images: [{ url: "/media/story-image.jpg" }],
@@ -39,18 +42,19 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", site: "@monadsimpcult" },
 };
 
-export const viewport: Viewport = { themeColor: "#08040f" };
+export const viewport: Viewport = { themeColor: "#0b0510", colorScheme: "dark" };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const cookie = (await headers()).get("cookie");
   return (
     <html lang="en" className={`${inter.variable} ${michroma.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
+        <a href="#main" className="skip-link">skip to content</a>
         <Providers cookie={cookie}>
           <Ambient />
           <GlobalRipple />
           <Nav />
-          <main className="flex-1 flex flex-col">{children}</main>
+          <main id="main" className="flex flex-1 flex-col">{children}</main>
           <Footer />
           <Toaster />
         </Providers>

@@ -10,6 +10,7 @@ import { ProposalCard } from "@/components/dao/ProposalCard";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { Icon } from "@/components/Icon";
 import { Reveal, Stagger, Item, Spotlight } from "@/components/motion";
+import { PageHeader } from "@/components/PageHeader";
 import { NewProposal } from "./NewProposal";
 import type { ArchivedProposal } from "./page";
 
@@ -28,34 +29,29 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
   const shownArchive = archive.filter((a) => a.id !== "archive-example");
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-5 pb-32 pt-36">
-      <Reveal>
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <div>
-          <p className="t-eyebrow mb-4">on-chain · monad</p>
-          <h1 className="t-h1 text-[clamp(34px,5vw,52px)]">simp dao</h1>
-          <p className="t-lead mt-5">
-            one nft, one vote. holders open proposals, holders decide. every vote is a transaction on monad — nothing
-            here can be edited after the fact.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 pb-1">
-          {mounted && session && isHolder ? (
+    <section className="page max-w-5xl">
+      <PageHeader
+        eyebrow="on-chain, on monad"
+        title="simp dao"
+        lead="one nft, one vote. holders open proposals, holders decide. every vote is a monad transaction, so nobody edits history."
+        aside={
+          mounted && session && isHolder ? (
             <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!DAO_DEPLOYED}>
               + new proposal
             </button>
           ) : (
             <WalletButton />
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
+      <Reveal>
 
       {!DAO_DEPLOYED && (
-        <div className="glass mt-10 flex items-start gap-3 p-6 text-sm text-dim">
+        <div className="glass mt-10 flex items-start gap-3 p-6 text-sm leading-relaxed text-dim">
           <Icon name="warn" className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
-          <span>
+          <span className="min-w-0 break-words">
             the dao contract isn&apos;t deployed yet. deploy <span className="mono">contracts/SimpDAO.sol</span> and set{" "}
-            <span className="mono">NEXT_PUBLIC_DAO_ADDRESS</span>. live proposals will show up here automatically.
+            <span className="mono">NEXT_PUBLIC_DAO_ADDRESS</span>. live proposals show up here on their own.
           </span>
         </div>
       )}
@@ -80,7 +76,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       </div>
 
       <Stagger key={tab} className="mt-7 grid gap-5 md:grid-cols-2">
-        {tab === "live" && (live.length ? live.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text={!mounted || props.isLoading ? "loading…" : "no live proposals. holders can open one."} />)}
+        {tab === "live" && (live.length ? live.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text={!mounted || props.isLoading ? "loading proposals…" : "no live proposals. holders can open one."} />)}
         {tab === "past" && (past.length ? past.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text="nothing has closed yet." />)}
         {tab === "archive" && (shownArchive.length ? shownArchive.map((a) => <ArchiveCard key={a.id} a={a} />) : <Empty text="votes held before the on-chain dao will be listed here." />)}
       </Stagger>
@@ -94,7 +90,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
 }
 
 function Empty({ text }: { text: string }) {
-  return <Item className="col-span-full"><div className="glass p-10 text-center text-sm text-dim">{text}</div></Item>;
+  return <Item className="col-span-full"><div className="glass border-dashed p-10 text-center text-sm text-dim">{text}</div></Item>;
 }
 
 function ArchiveCard({ a }: { a: ArchivedProposal }) {

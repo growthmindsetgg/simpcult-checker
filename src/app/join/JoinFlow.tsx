@@ -36,16 +36,16 @@ export function JoinFlow() {
   const step = !connected ? 1 : !verified ? 2 : !tgDone ? 3 : 4;
 
   return (
-    <div className="relative mt-14">
-      <div className="step-track" aria-hidden>
-        <motion.span
-          initial={false}
-          animate={{ height: `${((step - 1) / 3) * 100}%` }}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        />
-      </div>
+    <div className="mt-12">
+      <div className="relative space-y-4">
+        <div className="step-track" aria-hidden>
+          <motion.span
+            initial={false}
+            animate={{ height: `${((step - 1) / 3) * 100}%` }}
+            transition={{ duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
+          />
+        </div>
 
-      <div className="space-y-4">
         <StepCard n={1} title="connect your wallet" active={step === 1} done={step > 1}>
           <p className="text-sm text-dim">monad mainnet only. we never ask for approvals.</p>
           <div className="mt-3"><WalletButton /></div>
@@ -179,7 +179,7 @@ function ProveOwnership({
       </p>
 
       {challenge ? (
-        <div className="rounded-xl border border-line bg-black/30 p-4">
+        <div className="rounded-2xl border border-line bg-[rgba(5,0,6,0.45)] p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <div className="text-[11px] uppercase tracking-wider text-mute">send exactly</div>
@@ -217,7 +217,10 @@ function ProveOwnership({
               <p className="text-xs text-dim">
                 already sent the exact amount from your wallet to itself? paste the tx hash — we&apos;ll verify from == to, value and the 15-minute window.
               </p>
+              <label htmlFor="tx-hash" className="sr-only">transaction hash</label>
               <input
+                id="tx-hash"
+                name="tx-hash"
                 className="input mono"
                 placeholder="0x…"
                 value={pastedHash}
@@ -312,11 +315,12 @@ function BindTelegram({ enabled, onDone }: { enabled: boolean; onDone: () => voi
         accepts the handshake from that exact account.
       </p>
       <label htmlFor="tg-user" className="sr-only">telegram username</label>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <input
           id="tg-user"
+          name="telegram-username"
           className="input mono"
-          placeholder="@yourhandle"
+          placeholder="@yourhandle…"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           spellCheck={false}
@@ -352,13 +356,13 @@ function SafetyAccordion() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-xl border border-line bg-black/20 px-4 py-3 text-left text-sm text-dim hover:bg-black/30"
+        className="flex w-full items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3.5 text-left text-sm text-dim transition-colors hover:border-line-strong hover:text-text"
         aria-expanded={open}
       >
         <span className="flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-simp-2" /> how this stays safe
         </span>
-        <span className={`transition ${open ? "rotate-45" : ""}`} aria-hidden>+</span>
+        <span className={`text-simp-3 transition-transform duration-200 ${open ? "rotate-45" : ""}`} aria-hidden>+</span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -369,7 +373,7 @@ function SafetyAccordion() {
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <ul className="mt-3 list-disc space-y-2 rounded-xl border border-line bg-black/20 px-7 py-4 text-[13.5px] text-dim">
+            <ul className="mt-3 list-disc space-y-2 rounded-2xl border border-line bg-panel px-7 py-4 text-[13.5px] leading-relaxed text-dim marker:text-simp-4">
               <li><b className="text-text">no approvals, ever.</b> the only writes this site requests are dao propose/vote and your own self-transaction.</li>
               <li><b className="text-text">one chain.</b> wagmi is configured for monad (143) only — no silent chain switching.</li>
               <li><b className="text-text">readable signatures.</b> sign-in with ethereum names {SITE.domain}, your address and a single-use 5-min nonce.</li>
@@ -398,20 +402,20 @@ function StepCard({
 }) {
   return (
     <div
-      className={`glass relative p-6 transition ${active ? "pulse-neon border-simp/60" : ""} ${
-        !active && !done ? "opacity-55" : ""
-      }`}
+      className={`glass relative p-6 ${active ? "pulse-neon" : ""}`}
+      aria-current={active ? "step" : undefined}
     >
       <div className="flex items-center gap-3">
         <span
           className={`relative z-10 grid h-7 w-7 place-items-center rounded-full text-xs font-semibold transition-colors ${
-            done ? "bg-ok/25 text-ok" : active ? "bg-simp/25 text-simp-2" : "bg-white/5 text-mute"
+            done ? "bg-ok/20 text-ok" : active ? "bg-simp text-[#1d0414] shadow-[0_0_14px_rgb(var(--simp-rgb)/0.7)]" : "bg-bg-3 text-mute ring-1 ring-line"
           }`}
           aria-hidden
         >
           {done ? <Icon name="check" className="h-3.5 w-3.5" /> : n}
         </span>
-        <h3 className="t-h3 text-[17px]">{title}</h3>
+        <h2 className={`t-h3 text-[17px] ${!active && !done ? "!text-mute" : ""}`}>{title}</h2>
+        {done && <span className="sr-only">(done)</span>}
       </div>
       <AnimatePresence initial={false}>
         {active && (

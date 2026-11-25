@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
 import { JoinFlow } from "./JoinFlow";
-import { Reveal } from "@/components/motion";
+import { PageHeader } from "@/components/PageHeader";
 
-export const metadata: Metadata = { title: "join the cult" };
+export const metadata: Metadata = { title: "join the holders' chat" };
 
 export default function JoinPage() {
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 pb-32 pt-36">
-      <Reveal>
-        <p className="t-eyebrow mb-4">holders only</p>
-        <h1 className="t-h1 text-[clamp(34px,5vw,52px)]">join the cult chat</h1>
-        <p className="t-lead mt-5">
-          the telegram group is for simp cult nft holders only. prove you hold one, get a single-use invite. sell your
-          simp and the bot removes you automatically — re-verify whenever you&apos;re back.
-        </p>
-      </Reveal>
+    <section className="page max-w-3xl">
+      <PageHeader
+        eyebrow="holders only"
+        title="join the holders' chat"
+        lead={
+          <>
+            the telegram group is for simp cult nft holders. prove you hold one and get a single-use invite. sell your simp and
+            the bot shows you out. verify again whenever you&apos;re back.
+          </>
+        }
+      />
       <JoinFlow />
     </section>
   );

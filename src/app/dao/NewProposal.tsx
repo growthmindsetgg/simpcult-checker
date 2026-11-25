@@ -57,8 +57,8 @@ export function NewProposal({ open, onClose }: { open: boolean; onClose: () => v
           {cfg.data ? `${Math.round(cfg.data.period / 3600)}h` : "…"}.
         </p>
         <div className="mt-6 space-y-3">
-          <input className="input" placeholder="title (max 120)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
-          <textarea className="input min-h-36 resize-y" placeholder="what are we deciding? be specific: what, why, cost, who executes." value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={4000} />
+          <input className="input" name="title" aria-label="proposal title" autoComplete="off" placeholder="title (max 120)…" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          <textarea className="input min-h-36 resize-y" name="description" aria-label="proposal description" placeholder="what are we deciding? be specific: what, why, cost, who executes." value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={4000} />
           <div className="text-right text-[11px] text-mute">{desc.length}/4000</div>
         </div>
         {err && <p className="mt-2 text-xs text-bad">{err}</p>}

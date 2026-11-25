@@ -20,7 +20,7 @@ export function WalletButton({ className = "" }: { className?: string }) {
   return (
     <>
       <button className={`btn ${isConnected ? "btn-ghost" : "btn-primary"} ${className}`} onClick={() => setOpen(true)}>
-        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        {mounted && isConnected && <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />}
         {mounted && isConnected ? <span className="mono">{label}</span> : (<><Icon name="wallet" className="h-4 w-4" /> {label}</>)}
       </button>
       <WalletModal open={open} onClose={() => setOpen(false)} />
