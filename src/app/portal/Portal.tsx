@@ -149,7 +149,7 @@ function Dashboard({ season }: { season?: SeasonInfo }) {
     );
   const m = me.data;
   return (
-    <div className="mt-12 grid gap-6">
+    <div className="mt-12 grid grid-cols-1 gap-6">
       <div className="grid gap-6 md:grid-cols-[1.25fr_1fr]">
         <BalanceCard me={m} />
         <CheckinCard me={m} live={!!season?.live} />
@@ -591,7 +591,7 @@ function SeasonMeter({ info }: { info?: SeasonInfo }) {
     <div className="glass p-7">
       <div className="flex items-center justify-between gap-3">
         <h2 className="t-h2">season {info?.season ?? "—"} machine</h2>
-        {info && <span className="pill num">{fmt(info.simps)} simps earning</span>}
+        {info && <span className="pill num">{fmt(info.simps)} {info.simps === 1 ? "simp" : "simps"} earning</span>}
       </div>
       <p className="mt-2 text-sm text-dim">what each pool can still pay out this season. when a meter fills, that pool is done until next season.</p>
       <div className="mt-6 grid gap-5">

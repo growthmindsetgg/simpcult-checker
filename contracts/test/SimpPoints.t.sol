@@ -56,8 +56,13 @@ contract SimpPointsTest {
     }
 
     function publishRoot() internal {
-        vm.prank(minter);
+        vm.prank(owner);
         xp.setSeasonRoot(1, ROOT, TOTAL);
+    }
+
+    function setCap(uint256 season, uint256 cap) internal {
+        vm.prank(owner);
+        xp.setSeasonCap(season, cap);
     }
 
     // ───────────── leaf encoding matches the TS server ─────────────
@@ -126,23 +131,113 @@ contract SimpPointsTest {
         xp.claim(1, 1000, proofAlice());
     }
 
-    function test_RevertWhen_RootSetTwice() public {
+    function test_RevertWhen_RootResetAfterAClaim() public {
         publishRoot();
-        vm.prank(minter);
+        vm.prank(alice);
+        xp.claim(1, 1000, proofAlice());
+        vm.prank(owner);
         vm.expectRevert(SimpPoints.RootAlreadySet.selector);
         xp.setSeasonRoot(1, bytes32(uint256(1)), TOTAL);
+        require(xp.seasonRoot(1) == ROOT, "root kept");
+    }
+
+    function test_OwnerResetsRootBeforeAnyClaim() public {
+        // a wrong root + total goes out first
+        vm.prank(owner);
+        xp.setSeasonRoot(1, bytes32(uint256(1)), 999);
+        eq(xp.seasonCap(1), 999, "first cap");
+        // nothing claimed yet -> the owner can replace both
+        publishRoot();
+        require(xp.seasonRoot(1) == ROOT, "root replaced");
+        eq(xp.seasonCap(1), TOTAL, "cap follows the new total");
+        vm.prank(alice);
+        xp.claim(1, 1000, proofAlice());
+        eq(xp.balanceOf(alice, 1), 1000, "claims against the new root");
     }
 
     function test_RevertWhen_SeasonZero() public {
-        vm.prank(minter);
+        vm.prank(owner);
         vm.expectRevert(SimpPoints.BadSeason.selector);
         xp.setSeasonRoot(0, ROOT, TOTAL);
     }
 
-    function test_RevertWhen_NonMinterPublishesRoot() public {
+    function test_RevertWhen_NonOwnerPublishesRoot() public {
         vm.prank(alice);
-        vm.expectRevert(SimpPoints.NotMinter.selector);
+        vm.expectRevert(SimpPoints.NotOwner.selector);
         xp.setSeasonRoot(1, ROOT, TOTAL);
+    }
+
+    function test_RevertWhen_MinterPublishesRootOrCap() public {
+        vm.prank(minter);
+        vm.expectRevert(SimpPoints.NotOwner.selector);
+        xp.setSeasonRoot(1, ROOT, TOTAL);
+        vm.prank(minter);
+        vm.expectRevert(SimpPoints.NotOwner.selector);
+        xp.setSeasonCap(1, TOTAL);
+        // and the minter can't reset an existing root either
+        publishRoot();
+        vm.prank(minter);
+        vm.expectRevert(SimpPoints.NotOwner.selector);
+        xp.setSeasonRoot(1, bytes32(uint256(1)), TOTAL);
+    }
+
+    // ───────────── per-season maximum ─────────────
+    function test_MaxSeasonCapHalves() public view {
+        eq(xp.maxSeasonCap(0), 0, "s0");
+        eq(xp.maxSeasonCap(1), 500_000_000, "s1");
+        eq(xp.maxSeasonCap(2), 250_000_000, "s2");
+        eq(xp.maxSeasonCap(3), 125_000_000, "s3");
+        eq(xp.maxSeasonCap(29), 1, "s29");
+        eq(xp.maxSeasonCap(30), 0, "s30");
+        eq(xp.maxSeasonCap(300), 0, "s300");
+        uint256 sum;
+        for (uint256 s = 1; s <= 64; s++) {
+            sum += xp.maxSeasonCap(s);
+        }
+        require(sum <= 1_000_000_000, "all seasons fit in the supply");
+    }
+
+    function test_RootAtSeasonMaxAllowed() public {
+        vm.prank(owner);
+        xp.setSeasonRoot(1, ROOT, 500_000_000);
+        eq(xp.seasonCap(1), 500_000_000, "cap");
+    }
+
+    function test_RevertWhen_RootAboveSeasonMax() public {
+        vm.prank(owner);
+        vm.expectRevert(SimpPoints.CapAboveSeasonMax.selector);
+        xp.setSeasonRoot(1, ROOT, 500_000_001);
+        vm.prank(owner);
+        vm.expectRevert(SimpPoints.CapAboveSeasonMax.selector);
+        xp.setSeasonRoot(2, ROOT, 250_000_001);
+    }
+
+    function test_RevertWhen_CapAboveSeasonMax() public {
+        vm.prank(owner);
+        vm.expectRevert(SimpPoints.CapAboveSeasonMax.selector);
+        xp.setSeasonCap(2, 250_000_001);
+        vm.prank(owner);
+        vm.expectRevert(SimpPoints.CapAboveSeasonMax.selector);
+        xp.setSeasonCap(30, 1);
+        setCap(2, 250_000_000);
+        eq(xp.seasonCap(2), 250_000_000, "cap at max");
+    }
+
+    function test_RevertWhen_RootResetAboveSeasonMax() public {
+        publishRoot();
+        vm.prank(owner);
+        vm.expectRevert(SimpPoints.CapAboveSeasonMax.selector);
+        xp.setSeasonRoot(1, ROOT, 500_000_001);
+        eq(xp.seasonCap(1), TOTAL, "old cap kept");
+    }
+
+    function test_RevertWhen_BatchAfterRoot() public {
+        publishRoot();
+        (address[] memory a, uint256[] memory v) = batch();
+        vm.prank(minter);
+        vm.expectRevert(SimpPoints.BatchClosed.selector);
+        xp.settleBatch(1, a, v);
+        eq(xp.totalSupply(1), 0, "nothing minted");
     }
 
     // ───────────── batch settlement ─────────────
@@ -157,8 +252,7 @@ contract SimpPointsTest {
 
     function test_SettleBatch() public {
         (address[] memory a, uint256[] memory v) = batch();
-        vm.prank(minter);
-        xp.setSeasonCap(2, 3500);
+        setCap(2, 3500);
         vm.prank(minter);
         xp.settleBatch(2, a, v);
         eq(xp.balanceOf(alice, 2), 1000, "alice s2");
@@ -175,8 +269,7 @@ contract SimpPointsTest {
 
     function test_RevertWhen_BatchOverCap() public {
         (address[] memory a, uint256[] memory v) = batch();
-        vm.prank(minter);
-        xp.setSeasonCap(2, 3499);
+        setCap(2, 3499);
         vm.prank(minter);
         vm.expectRevert(SimpPoints.CapExceeded.selector);
         xp.settleBatch(2, a, v);
@@ -184,8 +277,7 @@ contract SimpPointsTest {
 
     function test_RevertWhen_BatchTwice() public {
         (address[] memory a, uint256[] memory v) = batch();
-        vm.prank(minter);
-        xp.setSeasonCap(2, 10_000);
+        setCap(2, 10_000);
         vm.prank(minter);
         xp.settleBatch(2, a, v);
         vm.prank(minter);
@@ -214,8 +306,7 @@ contract SimpPointsTest {
         uint256[] memory v = new uint256[](1);
         a[0] = alice;
         v[0] = 1000;
-        vm.prank(minter);
-        xp.setSeasonCap(1, TOTAL);
+        setCap(1, TOTAL);
         vm.prank(minter);
         xp.settleBatch(1, a, v);
         publishRoot(); // same total as the fixed cap -> allowed
@@ -226,17 +317,15 @@ contract SimpPointsTest {
     }
 
     function test_RevertWhen_RootTotalMismatchesCap() public {
-        vm.prank(minter);
-        xp.setSeasonCap(1, 100);
-        vm.prank(minter);
+        setCap(1, 100);
+        vm.prank(owner);
         vm.expectRevert(SimpPoints.CapMismatch.selector);
         xp.setSeasonRoot(1, ROOT, TOTAL);
     }
 
     function test_RevertWhen_CapSetTwice() public {
-        vm.prank(minter);
-        xp.setSeasonCap(3, 100);
-        vm.prank(minter);
+        setCap(3, 100);
+        vm.prank(owner);
         vm.expectRevert(SimpPoints.CapAlreadySet.selector);
         xp.setSeasonCap(3, 200);
     }
@@ -271,8 +360,11 @@ contract SimpPointsTest {
         vm.prank(owner);
         xp.setMinter(alice, true);
         require(xp.isMinter(alice), "minter");
+        setCap(2, 3500);
+        (address[] memory a, uint256[] memory v) = batch();
         vm.prank(alice);
-        xp.setSeasonRoot(1, ROOT, TOTAL);
+        xp.settleBatch(2, a, v);
+        eq(xp.totalSupply(2), 3500, "minter batched");
         vm.prank(owner);
         xp.setMinter(alice, false);
         require(!xp.isMinter(alice), "revoked");

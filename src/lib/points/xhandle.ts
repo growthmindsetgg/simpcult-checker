@@ -5,6 +5,8 @@ import { store } from "./store";
 import { K } from "./keys";
 import { HttpError } from "./http";
 import { HANDLE_RE, fetchOEmbed, normHandle, parseStatusUrl } from "./x";
+import { monadCardBalance, nftBalance } from "./chain";
+import { rateLimit } from "@/lib/server/ratelimit";
 
 /**
  * One X handle ⇄ one wallet.
@@ -14,7 +16,11 @@ import { HANDLE_RE, fetchOEmbed, normHandle, parseStatusUrl } from "./x";
  *    oEmbed confirms author + code → the handle is verified and reserved.
  *
  * Unverified handles still work for submissions, but every post then goes to
- * admin review; only verified handles get instant credit.
+ * admin review; only verified handles get instant credit. A handle that one
+ * wallet has verified can't be used by any other wallet.
+ *
+ * Verifying reserves a handle for good, so it is for holders only and
+ * rate-limited per wallet.
  */
 
 export type XHandle = { handle: string; verified: boolean; code: string; at: number };
@@ -53,6 +59,15 @@ export async function verifyHandle(addr: string, url: string): Promise<XHandle> 
 
   const parsed = parseStatusUrl(url ?? "");
   if (!parsed) throw new HttpError(400, "paste the link to your post (x.com/you/status/…)", "bad_url");
+
+  const [nfts, cards] = await Promise.all([
+    nftBalance(a as `0x${string}`).catch(() => 0),
+    monadCardBalance(a).catch(() => 0),
+  ]);
+  if (nfts < 1 && cards < 1) throw new HttpError(403, "verifying a handle is for holders", "not_holder");
+  if (!(await rateLimit("xverify", a, 5, 600))) {
+    throw new HttpError(429, "too many tries — wait a few minutes and try again", "rate_limited");
+  }
 
   const o = await fetchOEmbed(parsed.canonical);
   if (!o) throw new HttpError(503, "couldn't read that post from X right now — try again in a minute", "x_unavailable");

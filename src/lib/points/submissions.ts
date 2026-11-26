@@ -13,7 +13,7 @@ import { emit, normAddr } from "./ledger";
 import { store } from "./store";
 import { K } from "./keys";
 import { HttpError } from "./http";
-import { monadCardBalance, nftBalance } from "./chain";
+import { monadCardBalance, nftBalance, tokensOf } from "./chain";
 import { fetchOEmbed, hasKeyword, parseStatusUrl, statusTime } from "./x";
 import { getHandle } from "./xhandle";
 
@@ -21,6 +21,12 @@ import { getHandle } from "./xhandle";
  * Submissions: X posts (holders), "simp" posts (Monad card holders) and
  * alpha / contributions (holders). Everything lands in one queue; X posts
  * from a verified handle can be auto-approved via oEmbed.
+ *
+ * Daily caps are per wallet AND per NFT: each Simp Cult tokenId carries
+ * `dailyCap(kind)` submission slots per UTC day, whichever wallet holds it, so
+ * one NFT hopping between wallets can't multiply the cap (same idea as the
+ * check-in token lock). Monad card posts are capped per wallet only — card
+ * holdings can't be enumerated per token.
  */
 
 export type SubmissionKind = "x_post" | "simp_post" | "alpha";
@@ -81,12 +87,51 @@ export function rewardBounds(kind: SubmissionKind, season = seasonAt()): { min: 
   return { min: 1, max: d * 2 };
 }
 
-async function bumpCap(kind: SubmissionKind, a: string) {
-  const key = K.cap(kind, a, utcDay());
-  const n = await store().incrby(key, 1, 60 * 60 * 50);
+const CAP_TTL_SEC = 60 * 60 * 50; // keep ~2 days
+
+/**
+ * Take one of today's slots on one of `tokens`. Each SADD is atomic, so a
+ * slot can only ever be taken once, whoever holds the token.
+ */
+async function takeTokenSlot(kind: SubmissionKind, tokens: number[], day: string): Promise<boolean> {
+  const key = K.subTokens(kind, day);
+  const slots = dailyCap(kind);
+  for (const token of tokens) {
+    for (let slot = 0; slot < slots; slot++) {
+      const [fresh] = await store().saddEach(key, [`${token}:${slot}`], CAP_TTL_SEC);
+      if (fresh) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Reserve today's submission slot: the wallet's own cap first, then (for
+ * holder kinds) a slot on one of its NFTs. The token slot is taken last and
+ * the wallet counter is handed back if it fails, so a refusal costs nothing.
+ * `tokens` is null for kinds that aren't backed by Simp Cult NFTs.
+ */
+async function bumpCap(kind: SubmissionKind, a: string, tokens: number[] | null) {
+  const day = utcDay();
+  const key = K.cap(kind, a, day);
+  const n = await store().incrby(key, 1, CAP_TTL_SEC);
   if (n > dailyCap(kind)) {
     await store().incrby(key, -1);
     throw new HttpError(429, `daily limit reached (${dailyCap(kind)}/day) — come back tomorrow`, "cap");
+  }
+  if (!tokens) return;
+  let took = false;
+  try {
+    took = await takeTokenSlot(kind, tokens, day);
+  } finally {
+    if (!took) await store().incrby(key, -1);
+  }
+  if (!took) {
+    throw new HttpError(
+      429,
+      "your simps already used today's submissions from another wallet — come back tomorrow",
+      "tokens_used",
+    );
   }
 }
 
@@ -133,13 +178,22 @@ export async function submit(addr: string, input: SubmitInput): Promise<Submissi
   if (kind !== "x_post" && kind !== "simp_post" && kind !== "alpha") throw new HttpError(400, "unknown submission type");
 
   // ── eligibility (always live reads) ──
+  /** Simp Cult tokenIds backing this submission; null for Monad card posts */
+  let tokens: number[] | null = null;
   if (kind === "simp_post") {
     if (!MONAD_CARD_ENABLED) throw new HttpError(409, "monad card posts open soon", "monad_card_off");
     if ((await monadCardBalance(a).catch(() => 0)) < 1) {
       throw new HttpError(403, "simp posts are for monad card holders", "not_card_holder");
     }
-  } else if ((await nftBalance(a as `0x${string}`).catch(() => 0)) < 1) {
-    throw new HttpError(403, "this one's for simp cult holders", "not_holder");
+  } else {
+    if ((await nftBalance(a as `0x${string}`).catch(() => 0)) < 1) {
+      throw new HttpError(403, "this one's for simp cult holders", "not_holder");
+    }
+    tokens = await tokensOf(a);
+    if (tokens.length === 0) {
+      // the owner snapshot is up to a minute behind a fresh purchase
+      throw new HttpError(403, "this one's for simp cult holders — just got yours? try again in a minute", "not_holder");
+    }
   }
 
   const base: Submission = {
@@ -159,7 +213,7 @@ export async function submit(addr: string, input: SubmitInput): Promise<Submissi
     if (note.length > 2000) throw new HttpError(400, "keep the details under 2000 chars");
     if (proof.length < 1 || proof.length > 3) throw new HttpError(400, "add 1–3 proof links");
     if (!proof.every((p) => HTTPS_RE.test(p))) throw new HttpError(400, "proof links must be https:// urls");
-    await bumpCap(kind, a);
+    await bumpCap(kind, a, tokens);
     const s: Submission = { ...base, title, note, proof };
     await persistNew(s);
     return s;
@@ -173,20 +227,33 @@ export async function submit(addr: string, input: SubmitInput): Promise<Submissi
   if (parsed.handle.toLowerCase() !== h.handle.toLowerCase()) {
     throw new HttpError(400, `that link isn't from @${h.handle}`, "wrong_handle");
   }
+  // a handle someone else has proven is theirs can't be used by anyone else
+  const owner = await store().get<string>(K.xOwner(h.handle));
+  if (owner && owner !== a) {
+    throw new HttpError(409, `@${h.handle} is verified by another wallet`, "handle_taken");
+  }
+  const verified = h.verified && owner === a;
   const postedAt = statusTime(parsed.id);
   const maxAge = (kind === "x_post" ? POINTS_CONFIG.rewards.xPost : POINTS_CONFIG.rewards.simpPost).maxAgeDays;
   if (postedAt < seasonBounds(season).start) throw new HttpError(400, "that post is from before this season", "too_old");
   if (Date.now() - postedAt > maxAge * 86_400_000) throw new HttpError(400, `posts older than ${maxAge} days don't count`, "too_old");
   if (postedAt > Date.now() + 60_000) throw new HttpError(400, "that post id looks off", "bad_url");
 
-  // global dedupe on the status id — first submitter wins, forever
-  const claimed = await store().set(K.tweet(parsed.id), base.id, { nx: true });
-  if (!claimed) throw new HttpError(409, "that post was already submitted", "dupe");
+  // Global dedupe on the status id. Only a verified handle may claim it at
+  // submit time (first verified submitter wins, forever) — an unproven handle
+  // could be anyone, so it must not be able to lock the real author out. Its
+  // submission claims the id when an admin approves it (see `approve`).
+  if (verified) {
+    const claimed = await store().set(K.tweet(parsed.id), base.id, { nx: true });
+    if (!claimed) throw new HttpError(409, "that post was already submitted", "dupe");
+  } else if (await store().get<string>(K.tweet(parsed.id))) {
+    throw new HttpError(409, "that post was already submitted", "dupe");
+  }
 
   try {
-    await bumpCap(kind, a);
+    await bumpCap(kind, a, tokens);
   } catch (e) {
-    await store().del(K.tweet(parsed.id));
+    if (verified) await store().del(K.tweet(parsed.id));
     throw e;
   }
 
@@ -195,7 +262,7 @@ export async function submit(addr: string, input: SubmitInput): Promise<Submissi
     url: parsed.canonical,
     tweetId: parsed.id,
     handle: h.handle,
-    handleVerified: h.verified,
+    handleVerified: verified,
     postedAt,
   };
 
@@ -207,7 +274,7 @@ export async function submit(addr: string, input: SubmitInput): Promise<Submissi
       ? { reachable: true, author: o.authorHandle, keyword: hasKeyword(o.text, keywords) }
       : { reachable: false };
     const authorOk = !!o && o.authorHandle.toLowerCase() === h.handle.toLowerCase();
-    if (h.verified && authorOk && s.check.keyword) {
+    if (verified && authorOk && s.check.keyword) {
       await persistNew(s);
       // if instant credit fails (e.g. pool tapped out) it just stays pending
       return approve(s.id, { by: "auto", auto: true }).catch(() => s);
@@ -263,6 +330,19 @@ export async function approve(
     if (!Number.isSafeInteger(amount) || amount < min || amount > max) {
       throw new HttpError(400, `reward must be a whole number between ${min} and ${max}`);
     }
+    if (s.tweetId) {
+      // the handle may have been proven by someone else since this was submitted
+      const owner = s.handle ? await store().get<string>(K.xOwner(s.handle)) : null;
+      if (owner && owner !== s.address) {
+        throw new HttpError(409, `@${s.handle} is now verified by another wallet — reject this one`, "handle_taken");
+      }
+      // one post, one payout: claim the status id (a verified submission
+      // already holds it; an unverified one claims it here)
+      const claimed = await store().set(K.tweet(s.tweetId), s.id, { nx: true });
+      if (!claimed && (await store().get<string>(K.tweet(s.tweetId))) !== s.id) {
+        throw new HttpError(409, "that post was already credited to another submission", "dupe");
+      }
+    }
     // idempotent on the submission id — a retry can never double-pay
     await emit(KIND_POOL[s.kind], s.address, amount, s.kind, `sub:${s.id}`, { submission: s.id });
     const done: Submission = {
@@ -293,8 +373,11 @@ export async function reject(id: string, opts: { by: string; note?: string }): P
     };
     await finish(done);
     // a post submitted from an unproven handle may not be the submitter's —
-    // free its id so the real author can still submit it
-    if (s.tweetId && !s.handleVerified) await store().del(K.tweet(s.tweetId));
+    // if this submission holds its id (a failed approval, or one made before
+    // unverified submissions stopped claiming ids), free it for the real author
+    if (s.tweetId && !s.handleVerified && (await store().get<string>(K.tweet(s.tweetId))) === s.id) {
+      await store().del(K.tweet(s.tweetId));
+    }
     return done;
   });
 }

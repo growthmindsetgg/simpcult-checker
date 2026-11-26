@@ -402,7 +402,7 @@ export function SlotGame() {
   const signedOut = status === "signedOut";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-start lg:gap-10">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:items-start lg:gap-10">
       <div className={styles.machine} data-spinning={spinning}>
         <div className={styles.marquee}>
           <div className={styles.marqueeLeft}>
@@ -537,7 +537,7 @@ export function SlotGame() {
         </p>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <Paytable art={art} bet={bet} />
         <Fairness
           hash={hash}

@@ -7,14 +7,23 @@ pragma solidity ^0.8.24;
 ///         approval path reverts. Wallets and explorers still read it as a
 ///         normal ERC-1155 (balanceOf / uri / TransferSingle on mint).
 ///
-///         Settlement (per season, by a minter):
-///           a) merkle: `setSeasonRoot(season, root, total)` once, then each
-///              holder calls `claim(season, amount, proof)` (or anyone claims
-///              on their behalf via `claimFor` — XP always lands on `account`).
-///           b) batch: `settleBatch(season, accounts, amounts)` mints directly.
+///         Settlement (per season):
+///           a) merkle: the owner calls `setSeasonRoot(season, root, total)`,
+///              then each holder calls `claim(season, amount, proof)` (or
+///              anyone claims on their behalf via `claimFor` — XP always lands
+///              on `account`). The owner may replace a wrong root only while
+///              nothing has been minted for that season.
+///           b) batch: the owner fixes the cap with `setSeasonCap`, then a
+///              minter calls `settleBatch(season, accounts, amounts)`. Closed
+///              for good once the season has a root.
 ///         Both paths share one `claimed` flag per (season, account), so an
 ///         account can never be settled twice, and every mint is checked
-///         against the season cap fixed on first settlement.
+///         against the season cap.
+///
+///         Hard supply schedule, enforced here and not just by the server:
+///         a season's cap can never exceed `maxSeasonCap(season)` — 500,000,000
+///         whole points for season 1, halving every season (250M, 125M, …).
+///         Amounts are whole points (no decimals), same unit as the ledger.
 ///
 ///         Leaf = keccak256(bytes.concat(keccak256(abi.encode(account, season, amount)))).
 ///         Pairs are hashed sorted (OpenZeppelin MerkleProof compatible).
@@ -35,6 +44,8 @@ contract SimpPoints {
     error CapMismatch();
     error LengthMismatch();
     error ZeroAmount();
+    error CapAboveSeasonMax();
+    error BatchClosed();
 
     // ───────────────────────────── events ─────────────────────────────
     // ERC-1155
@@ -53,6 +64,9 @@ contract SimpPoints {
     string public constant name = "Simp Cult XP";
     string public constant symbol = "SIMPXP";
 
+    /// most XP season 1 can ever mint, in whole points; halves each season after
+    uint256 public constant SEASON_ONE_MAX = 500_000_000;
+
     // ───────────────────────────── storage ─────────────────────────────
     address public owner;
     mapping(address => bool) public isMinter;
@@ -65,9 +79,9 @@ contract SimpPoints {
     mapping(address => uint256) public xpOf;
     /// minted per season
     mapping(uint256 => uint256) public totalSupply;
-    /// max mintable per season (fixed once set; 0 = not set yet)
+    /// max mintable per season (0 = not set yet; never above maxSeasonCap)
     mapping(uint256 => uint256) public seasonCap;
-    /// merkle root per season (set once)
+    /// merkle root per season (replaceable by the owner until the first mint)
     mapping(uint256 => bytes32) public seasonRoot;
     /// settled flag per season per account (shared by claim + batch)
     mapping(uint256 => mapping(address => bool)) public claimed;
@@ -114,19 +128,31 @@ contract SimpPoints {
 
     // ───────────────────────────── settlement ─────────────────────────────
 
-    /// @notice Publish a season's merkle root and its total (becomes the cap). Once only.
-    function setSeasonRoot(uint256 season, bytes32 root, uint256 total) external onlyMinter {
+    /// @notice The hard ceiling for a season's cap: 500M for season 1, halving each season.
+    function maxSeasonCap(uint256 season) public pure returns (uint256) {
+        if (season == 0 || season > 64) return 0;
+        return SEASON_ONE_MAX >> (season - 1);
+    }
+
+    /// @notice Publish a season's merkle root and its total (becomes the cap). Owner only.
+    ///         A root can be replaced (with its total) only while nothing has been
+    ///         minted for the season; after the first claim it is final.
+    function setSeasonRoot(uint256 season, bytes32 root, uint256 total) external onlyOwner {
         if (season == 0) revert BadSeason();
         if (root == bytes32(0)) revert NoRoot();
-        if (seasonRoot[season] != bytes32(0)) revert RootAlreadySet();
         if (total == 0) revert ZeroAmount();
+        if (seasonRoot[season] != bytes32(0)) {
+            // reset: nothing minted yet, so the old root and its cap can be dropped
+            if (totalSupply[season] != 0) revert RootAlreadySet();
+            seasonCap[season] = 0;
+        }
         seasonRoot[season] = root;
         _fixCap(season, total);
         emit SeasonRootSet(season, root, total);
     }
 
-    /// @notice Fix a season's cap ahead of a batch settlement. Once only.
-    function setSeasonCap(uint256 season, uint256 cap) external onlyMinter {
+    /// @notice Fix a season's cap ahead of a batch settlement. Owner only, once only.
+    function setSeasonCap(uint256 season, uint256 cap) external onlyOwner {
         if (season == 0) revert BadSeason();
         if (cap == 0) revert ZeroAmount();
         if (seasonCap[season] != 0) revert CapAlreadySet();
@@ -143,9 +169,11 @@ contract SimpPoints {
         _claim(account, season, amount, proof);
     }
 
-    /// @notice Mint season XP directly. The season cap must be fixed first.
+    /// @notice Mint season XP directly. The owner must fix the season cap first,
+    ///         and the season must not have a merkle root (then it settles by claims only).
     function settleBatch(uint256 season, address[] calldata accounts, uint256[] calldata amounts) external onlyMinter {
         if (season == 0) revert BadSeason();
+        if (seasonRoot[season] != bytes32(0)) revert BatchClosed();
         if (accounts.length != amounts.length) revert LengthMismatch();
         for (uint256 i = 0; i < accounts.length; i++) {
             _settle(accounts[i], season, amounts[i]);
@@ -175,6 +203,7 @@ contract SimpPoints {
     }
 
     function _fixCap(uint256 season, uint256 cap) internal {
+        if (cap > maxSeasonCap(season)) revert CapAboveSeasonMax();
         if (seasonCap[season] == 0) {
             seasonCap[season] = cap;
             emit SeasonCapSet(season, cap);

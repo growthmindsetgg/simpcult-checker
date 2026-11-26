@@ -16,8 +16,10 @@ import { MerkleTree, leafHash } from "./merkle";
  * records what you earned that season.
  *
  * Freezing snapshots the earners once; the snapshot is immutable afterwards.
- * The admin then calls `setSeasonRoot(season, root, total)` on the contract
- * (or `settleBatch` with the exported rows). Holders claim with their proof.
+ * The contract owner then calls `setSeasonRoot(season, root, total)` (or
+ * `setSeasonCap` + a minter's `settleBatch` with the exported rows — one or
+ * the other: batches close once a root is set). Holders claim with their
+ * proof. The contract itself refuses a total above the season's maximum.
  */
 
 export type Settlement = {

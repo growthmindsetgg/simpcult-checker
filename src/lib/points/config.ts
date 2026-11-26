@@ -124,6 +124,12 @@ export const MONAD_CARD_ENABLED =
 
 export const SEASON_MS = POINTS_CONFIG.season.lengthDays * DAY_MS;
 export const SEASON1_START_MS = Date.parse(POINTS_CONFIG.season.season1Start);
+// a typo here would make every season NaN and quietly switch earning off
+if (!Number.isFinite(SEASON1_START_MS)) {
+  throw new Error(
+    `NEXT_PUBLIC_POINTS_SEASON1_START is not a valid date: "${POINTS_CONFIG.season.season1Start}" — use ISO 8601, e.g. 2026-11-24T00:00:00Z`,
+  );
+}
 
 /** 0 = before season 1 starts; 1, 2, 3 … afterwards. */
 export function seasonAt(ts: number = Date.now()): number {

@@ -5,7 +5,7 @@ import { monadCardBalance, nftBalance } from "@/lib/points/chain";
 import { capsLeft, mySubmissions } from "@/lib/points/submissions";
 import { myRank } from "@/lib/points/season";
 import { getHandle } from "@/lib/points/xhandle";
-import { handle, isAdmin, ok, requireSession } from "@/lib/points/http";
+import { handle, isAdminSession, ok, requireSession } from "@/lib/points/http";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,6 @@ export const GET = handle(async () => {
     caps,
     submissions,
     rank,
-    admin: isAdmin(a),
+    admin: isAdminSession(s),
   });
 });

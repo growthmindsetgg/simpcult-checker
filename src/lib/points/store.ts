@@ -8,7 +8,8 @@ import { Redis } from "@upstash/redis";
  *   - Upstash Redis (UPSTASH_REDIS_REST_URL / _TOKEN). The balance-changing
  *     step is a single Lua script, so check + write is atomic.
  *   - In-memory twin for local dev (same semantics; JS is single-threaded so
- *     each `apply` runs to completion without interleaving).
+ *     each `apply` runs to completion without interleaving). Production
+ *     refuses it: `store()` throws when the Upstash vars are missing.
  *
  * Every key starts with the hash tag `{pts}` so multi-key scripts stay in one
  * slot on any Redis topology.
@@ -21,6 +22,8 @@ export type ApplyArgs = {
   balKey: string;
   /** idempotency key */
   refKey: string;
+  /** seconds the idempotency key lives (omit = forever) */
+  refTtl?: number;
   /** ledger list key */
   ledgerKey: string;
   /** signed integer delta */
@@ -44,6 +47,8 @@ export type ApplyResult =
   | { status: "ok"; balance: number }
   | { status: "duplicate"; balance: number; entry: string }
   | { status: "insufficient"; balance: number }
+  /** a revoke larger than what the address earned in that season */
+  | { status: "not_earned"; balance: number }
   | { status: "pool_exhausted"; balance: number };
 
 export interface PointsStore {
@@ -75,7 +80,7 @@ export interface PointsStore {
 /*
  * KEYS: 1 bal, 2 ref, 3 ledger, 4 pool, 5 lb, 6 stats
  * ARGV: 1 delta, 2 entry, 3 poolCap (-1 = none), 4 lbMember ('' = none),
- *       5 keep, 6 statsField ('' = none)
+ *       5 keep, 6 statsField ('' = none), 7 refTtl seconds (0 = forever)
  * Returns {code, balance, extra}: code 1 ok, 2 duplicate, 0 refused.
  * ARGV values arrive as strings — everything numeric goes through tonumber.
  */
@@ -89,10 +94,19 @@ local cap = tonumber(ARGV[3])
 if cap >= 0 then
   local em = tonumber(redis.call('GET', KEYS[4]) or '0')
   if delta > 0 and em + delta > cap then return {0, bal, 'pool_exhausted'} end
+  if delta < 0 and ARGV[4] ~= '' then
+    local earned = tonumber(redis.call('ZSCORE', KEYS[5], ARGV[4]) or '0')
+    if earned + delta < 0 then return {0, bal, 'not_earned'} end
+  end
   redis.call('INCRBY', KEYS[4], delta)
 end
 bal = redis.call('INCRBY', KEYS[1], delta)
-redis.call('SET', KEYS[2], ARGV[2])
+local ttl = tonumber(ARGV[7])
+if ttl > 0 then
+  redis.call('SET', KEYS[2], ARGV[2], 'EX', ttl)
+else
+  redis.call('SET', KEYS[2], ARGV[2])
+end
 redis.call('LPUSH', KEYS[3], ARGV[2])
 redis.call('LTRIM', KEYS[3], 0, tonumber(ARGV[5]) - 1)
 if ARGV[4] ~= '' then redis.call('ZINCRBY', KEYS[5], delta, ARGV[4]) end
@@ -122,12 +136,14 @@ class UpstashStore implements PointsStore {
       a.lbKey && a.lbMember ? a.lbMember : "",
       String(a.keep),
       a.statsKey && a.statsField ? a.statsField : "",
+      String(a.refTtl ?? 0),
     ];
     const [code, bal, extra] = await this.r.eval<string[], [number, number, unknown]>(APPLY_LUA, keys, args);
     const balance = Number(bal);
     if (Number(code) === 1) return { status: "ok", balance };
     if (Number(code) === 2) return { status: "duplicate", balance, entry: asString(extra) };
-    return { status: extra === "pool_exhausted" ? "pool_exhausted" : "insufficient", balance };
+    if (extra === "pool_exhausted" || extra === "not_earned") return { status: extra, balance };
+    return { status: "insufficient", balance };
   }
 
   async get<T>(key: string) {
@@ -244,11 +260,15 @@ class MemoryStore implements PointsStore {
     if (a.poolKey && a.poolCap !== undefined && a.poolCap >= 0) {
       const em = Number(this.read(a.poolKey) ?? 0);
       if (a.delta > 0 && em + a.delta > a.poolCap) return { status: "pool_exhausted", balance: bal };
+      if (a.delta < 0 && a.lbKey && a.lbMember) {
+        const earned = this.read<Map<string, number>>(a.lbKey)?.get(a.lbMember) ?? 0;
+        if (earned + a.delta < 0) return { status: "not_earned", balance: bal };
+      }
       this.write(a.poolKey, em + a.delta);
     }
     const next = bal + a.delta;
     this.write(a.balKey, next);
-    this.write(a.refKey, a.entry);
+    this.write(a.refKey, a.entry, a.refTtl);
     await this.lpush(a.ledgerKey, a.entry, a.keep);
     if (a.lbKey && a.lbMember) {
       const z = this.zset(a.lbKey);
@@ -354,8 +374,9 @@ export function store(): PointsStore {
   if (url && token) {
     globalThis.__simpPointsStore = new UpstashStore(new Redis({ url, token }));
   } else {
+    // called per request, never at import time, so `next build` is unaffected
     if (process.env.NODE_ENV === "production") {
-      console.warn("[points] UPSTASH_REDIS_* not set — points live in memory and will NOT persist");
+      throw new Error("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN must be set in production");
     }
     globalThis.__simpPointsStore = new MemoryStore();
   }

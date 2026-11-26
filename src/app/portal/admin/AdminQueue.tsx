@@ -74,7 +74,7 @@ export function AdminQueue() {
       ) : queue.isLoading ? (
         <div className="glass mt-10 h-48 animate-pulse" />
       ) : queue.data ? (
-        <div className="mt-10 grid gap-6">
+        <div className="mt-10 grid grid-cols-1 gap-6">
           <StatsPanel />
           <Pending q={queue.data} />
           <div className="grid gap-6 lg:grid-cols-2">

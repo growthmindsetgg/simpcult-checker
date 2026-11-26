@@ -6,7 +6,8 @@ import { Redis } from "@upstash/redis";
  *  - Production: Upstash Redis (set UPSTASH_REDIS_REST_URL / _TOKEN — Vercel
  *    Marketplace → Upstash creates these for you).
  *  - Local dev without Redis: in-memory Map (NOT safe on serverless — nonces
- *    and Telegram links won't persist between invocations).
+ *    and Telegram links won't persist between invocations). Production
+ *    refuses to start on it: `kv()` throws when the Upstash vars are missing.
  */
 export interface KV {
   get<T = string>(key: string): Promise<T | null>;
@@ -14,6 +15,8 @@ export interface KV {
   del(key: string): Promise<void>;
   /** get-and-delete (atomic on Redis) — used to consume single-use nonces */
   take<T = string>(key: string): Promise<T | null>;
+  /** atomic INCR; the TTL is set when the key is created (fixed window) */
+  incr(key: string, ttlSec: number): Promise<number>;
   keys(prefix: string): Promise<string[]>;
 }
 
@@ -38,14 +41,27 @@ class MemoryKV implements KV {
     this.m.delete(k);
   }
   async take<T>(k: string) {
-    const v = await this.get<T>(k);
+    // no await between read and delete, so two concurrent takes can't both win
+    const v = (this.live(k)?.v as T) ?? null;
     this.m.delete(k);
     return v;
+  }
+  async incr(k: string, ttl: number) {
+    const e = this.live(k);
+    const n = Number(e?.v ?? 0) + 1;
+    this.m.set(k, { v: n, exp: e ? e.exp : Date.now() + ttl * 1000 });
+    return n;
   }
   async keys(prefix: string) {
     return [...this.m.keys()].filter((k) => k.startsWith(prefix));
   }
 }
+
+const INCR_LUA = `
+local n = redis.call('INCR', KEYS[1])
+if n == 1 then redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1])) end
+return n
+`;
 
 class UpstashKV implements KV {
   constructor(private r: Redis) {}
@@ -61,6 +77,9 @@ class UpstashKV implements KV {
   }
   async take<T>(k: string) {
     return (await this.r.getdel<T>(k)) ?? null;
+  }
+  async incr(k: string, ttl: number) {
+    return Number(await this.r.eval<string[], number>(INCR_LUA, [k], [String(ttl)]));
   }
   async keys(prefix: string) {
     const out: string[] = [];
@@ -85,8 +104,9 @@ export function kv(): KV {
   if (url && token) {
     globalThis.__simpKV = new UpstashKV(new Redis({ url, token }));
   } else {
+    // called per request, never at import time, so `next build` is unaffected
     if (process.env.NODE_ENV === "production") {
-      console.warn("[simp] UPSTASH_REDIS_* not set — using in-memory store (not persistent!)");
+      throw new Error("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN must be set in production");
     }
     globalThis.__simpKV = new MemoryKV();
   }

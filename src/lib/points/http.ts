@@ -26,7 +26,10 @@ export function fail(e: unknown) {
     return NextResponse.json({ error: e.message, code: e.code }, { status: e.status, headers: NO_STORE });
   }
   if (e instanceof PointsError) {
-    const status = e.code === "insufficient_balance" || e.code === "pool_exhausted" || e.code === "season_closed" ? 409 : 400;
+    const status =
+      e.code === "insufficient_balance" || e.code === "pool_exhausted" || e.code === "season_closed" || e.code === "not_earned"
+        ? 409
+        : 400;
     return NextResponse.json({ error: e.message, code: e.code }, { status, headers: NO_STORE });
   }
   console.error("[points]", e);
@@ -85,13 +88,25 @@ export function isAdmin(addr?: string | null): boolean {
   return !!addr && adminList().has(addr.toLowerCase());
 }
 
+/**
+ * Admin routes only accept a signature (SIWE) session. A self-transaction
+ * session proves less — its nonce is public calldata — so it never unlocks
+ * admin powers.
+ */
+export function isAdminSession(s: Session | null): boolean {
+  return !!s && s.method === "siwe" && isAdmin(s.address);
+}
+
 export async function requireAdmin(): Promise<Session> {
   const s = await requireSession();
   if (!isAdmin(s.address)) throw new HttpError(403, "admins only", "not_admin");
+  if (s.method !== "siwe") {
+    throw new HttpError(403, "admin needs a signature sign-in — sign out and verify by signing", "siwe_required");
+  }
   return s;
 }
 
-/** Vercel cron sends `Authorization: Bearer <CRON_SECRET>` */
+/** Vercel cron sends `Authorization: Bearer <CRON_SECRET>`. No secret set = nobody is cron. */
 export function isCron(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   return !!secret && req.headers.get("authorization") === `Bearer ${secret}`;

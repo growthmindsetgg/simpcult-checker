@@ -8,11 +8,14 @@ export const maxDuration = 30;
  * Telegram → us. Register once (see README):
  *   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://simpcult.xyz/api/telegram/webhook
  *     &secret_token=<TELEGRAM_WEBHOOK_SECRET>&allowed_updates=["message","chat_member"]
- * grammy verifies the X-Telegram-Bot-Api-Secret-Token header for us.
+ * grammy verifies the X-Telegram-Bot-Api-Secret-Token header for us — but only
+ * when a secret is configured, so without one we refuse every update.
  */
 export async function POST(req: Request) {
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secretToken) return new Response("unauthorized", { status: 401 });
   const handler = webhookCallback(bot(), "std/http", {
-    secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+    secretToken,
     timeoutMilliseconds: 25_000,
   });
   return handler(req);

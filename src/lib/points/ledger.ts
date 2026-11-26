@@ -46,7 +46,9 @@ export type PointsErrorCode =
   | "season_closed"
   | "invalid_amount"
   | "invalid_address"
-  | "invalid_ref";
+  | "invalid_ref"
+  | "invalid_season"
+  | "not_earned";
 
 export class PointsError extends Error {
   constructor(
@@ -92,10 +94,19 @@ type ApplyOpts = {
   refId: string;
   pool: PoolId | null;
   meta?: Record<string, unknown>;
+  /** season whose pool / leaderboard / stats this touches (default: current) */
+  season?: number;
 };
 
+/**
+ * House transfers (game bets and wins) are high-volume, and a spin can only be
+ * retried for a day, so their idempotency keys expire. Emission and admin
+ * refs stay forever: a replay there would mint points twice.
+ */
+const HOUSE_REF_TTL_SEC = 60 * 60 * 24 * 30;
+
 async function apply(o: ApplyOpts): Promise<Receipt> {
-  const season = seasonAt();
+  const season = o.season ?? seasonAt();
   const entry: LedgerEntry = {
     id: `${o.dir}:${o.refId}`,
     refId: o.refId,
@@ -111,6 +122,7 @@ async function apply(o: ApplyOpts): Promise<Receipt> {
   const res: ApplyResult = await store().apply({
     balKey: K.bal(o.address),
     refKey: K.ref(o.dir, o.address, o.refId),
+    ...(isEmission ? {} : { refTtl: HOUSE_REF_TTL_SEC }),
     ledgerKey: K.ledger(o.address),
     delta: o.delta,
     entry: JSON.stringify(entry),
@@ -137,6 +149,12 @@ async function apply(o: ApplyOpts): Promise<Receipt> {
       throw new PointsError(
         "insufficient_balance",
         `not enough points: have ${res.balance}, need ${-o.delta}`,
+        res.balance,
+      );
+    case "not_earned":
+      throw new PointsError(
+        "not_earned",
+        `can't take back ${-o.delta}: that's more than this wallet earned in season ${season}`,
         res.balance,
       );
     case "pool_exhausted":
@@ -213,8 +231,11 @@ export async function emit(
 }
 
 /**
- * Admin correction: take back emitted points (returns them to the season's
- * pool and the leaderboard). Fails on insufficient balance like `debit`.
+ * Admin correction: take back emitted points (returns them to `season`'s pool
+ * and leaderboard — pass the season the points were earned in; default is the
+ * current one). Fails on insufficient balance like `debit`, and with
+ * `not_earned` when the wallet earned less than `amount` in that season, so a
+ * pool counter can never drop below what it really emitted.
  */
 export async function revokeEmission(
   pool: PoolId,
@@ -223,10 +244,14 @@ export async function revokeEmission(
   reason: string,
   refId: string,
   meta?: Record<string, unknown>,
+  season: number = seasonAt(),
 ): Promise<Receipt> {
   const address = normAddr(addr);
   checkAmount(amount);
   checkReason(reason);
   checkRef(refId);
-  return apply({ dir: "e", address, delta: -amount, reason, refId, pool, meta });
+  if (!Number.isSafeInteger(season) || season < 1 || season > seasonAt()) {
+    throw new PointsError("invalid_season", `season must be a whole number between 1 and ${seasonAt()}`);
+  }
+  return apply({ dir: "e", address, delta: -amount, reason, refId, pool, meta, season });
 }

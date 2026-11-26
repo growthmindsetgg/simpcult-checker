@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { parseSiweMessage, verifySiweMessage } from "viem/siwe";
 import { getAddress, isHex } from "viem";
-import { kv } from "@/lib/server/store";
+import { consumeNonce } from "@/lib/server/nonce";
+import { clientIp, rateLimit } from "@/lib/server/ratelimit";
 import { publicClient, nftBalance } from "@/lib/server/chain";
 import { setSessionCookie } from "@/lib/server/session";
 import { CHAIN_ID, SITE } from "@/lib/config";
@@ -11,9 +12,13 @@ export const dynamic = "force-dynamic";
 /**
  * Sign-In With Ethereum (EIP-4361) verification.
  * Checks: signature (EOA, ERC-1271 smart wallets, ERC-6492), domain binding,
- * chain id 143, nonce is ours + unused + unexpired, message not expired.
+ * chain id 143, nonce is ours + unused + unexpired + issued to this browser,
+ * message not expired.
  */
 export async function POST(req: Request) {
+  if (!(await rateLimit("verify", clientIp(req), 10, 60))) {
+    return NextResponse.json({ error: "too many attempts — wait a minute" }, { status: 429, headers: { "retry-after": "60" } });
+  }
   const body = (await req.json().catch(() => null)) as
     | { message?: string; signature?: string }
     | null;
@@ -29,9 +34,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "wrong chain — monad (143) only" }, { status: 400 });
   }
 
-  // consume nonce (single use)
-  const had = await kv().take(`nonce:${parsed.nonce}`);
-  if (!had) {
+  // consume nonce (single use, bound to this browser's nonce cookie)
+  if (!(await consumeNonce(parsed.nonce))) {
     return NextResponse.json({ error: "nonce expired or already used — try again" }, { status: 401 });
   }
 

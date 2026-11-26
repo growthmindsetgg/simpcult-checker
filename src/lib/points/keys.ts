@@ -24,6 +24,8 @@ export const K = {
   subsDone: () => `${P}:subs:done`,
   subsUser: (a: string) => `${P}:subs:user:${a}`,
   cap: (kind: string, a: string, day: string) => `${P}:cap:${kind}:${a}:${day}`,
+  /** set of `${tokenId}:${slot}` — the daily submission slots each NFT has used */
+  subTokens: (kind: string, day: string) => `${P}:subtok:${kind}:${day}`,
 
   owners: () => `${P}:nft:owners`,
   settle: (season: number) => `${P}:settle:${season}`,

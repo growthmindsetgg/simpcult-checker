@@ -17,6 +17,7 @@ interface Vm {
 ///   forge script script/SimpPoints.s.sol:DeploySimpPoints --rpc-url https://rpc.monad.xyz --broadcast --private-key $PK
 ///
 /// After deploy, per season: freeze the season in /portal/admin, copy root + total, then
+/// FROM THE OWNER (setSeasonRoot / setSeasonCap are owner-only; the minter can only settleBatch):
 ///   cast send <XP> "setSeasonRoot(uint256,bytes32,uint256)" <season> <root> <total>
 contract DeploySimpPoints {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
