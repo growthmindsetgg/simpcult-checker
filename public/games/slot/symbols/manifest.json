@@ -1,9 +1,17 @@
 {
-  "$comment": "Simp Machine symbol art. Keys are symbol ids from src/games/slot/config.ts (never rename them). To swap art: drop a square image (svg, png or webp, transparent background, 512x512 or larger) in this folder and point src at it. label is the on-screen name, alt is for screen readers, credit is shown in the game's art credits. Missing entries fall back to <id>.svg (the original placeholder drawings, still in this folder). Full sources and licence notes: research/monad-assets/SOURCES.md.",
-  "version": 2,
+  "$comment": "Simp Machine symbol art. Keys are symbol ids from src/games/slot/config.ts (never rename them). To swap art: drop a square image (svg, png or webp, transparent background, 512x512 or larger) in this folder and point src at it. label is the on-screen name, alt is for screen readers, credit is shown in the game's art credits. founder-1/2/3 are the face symbols (ids are fixed): founder-1 is swapped at runtime for the signed-in simp's NFT, src here is the signed-out fallback. Missing entries fall back to <id>.svg (the original placeholder drawings, still in this folder). Full sources and licence notes: research/monad-assets/SOURCES.md.",
+  "version": 3,
   "symbols": {
-    "heart": { "src": "heart.svg", "label": "Heart", "alt": "Glossy pink heart" },
-    "rose": { "src": "rose.svg", "label": "Rose", "alt": "Red rose" },
+    "heart": {
+      "src": "heart.svg",
+      "label": "Heart",
+      "alt": "Glossy pink heart"
+    },
+    "rose": {
+      "src": "rose.svg",
+      "label": "Rose",
+      "alt": "Red rose"
+    },
     "chog": {
       "src": "mascot-chog.png",
       "label": "Chog",
@@ -22,16 +30,38 @@
       "alt": "Moyaki, a Monad community mascot",
       "credit": "Chog, Molandak and Moyaki are Monad community characters"
     },
-    "founder-1": { "src": "founder-1.svg", "label": "Founder I", "alt": "Founder caricature one, placeholder art" },
-    "founder-2": { "src": "founder-2.svg", "label": "Founder II", "alt": "Founder caricature two, placeholder art" },
-    "founder-3": { "src": "founder-3.svg", "label": "Founder III", "alt": "Founder caricature three, placeholder art" },
+    "founder-1": {
+      "src": "face-you.svg",
+      "label": "Your face",
+      "alt": "your face: sign in and your Simp Cult NFT takes this spot"
+    },
+    "founder-2": {
+      "src": "/media/nft/simp-137.webp",
+      "label": "Fellow simp",
+      "alt": "Simp Cult #137, a fellow simp",
+      "credit": "faces are Simp Cult NFT art"
+    },
+    "founder-3": {
+      "src": "/media/nft/simp-300.webp",
+      "label": "Elder simp",
+      "alt": "Simp Cult #300, another simp",
+      "credit": "faces are Simp Cult NFT art"
+    },
     "monad": {
       "src": "logo-monad-logomark.png",
       "label": "Monad",
       "alt": "Monad logo",
       "credit": "Monad logo © Monad Foundation, CC BY 4.0"
     },
-    "wild": { "src": "wild.svg", "label": "SIMP", "alt": "SIMP wild badge" },
-    "scatter": { "src": "scatter.svg", "label": "Love letter", "alt": "Love letter with a heart seal" }
+    "wild": {
+      "src": "wild.svg",
+      "label": "SIMP",
+      "alt": "SIMP wild badge"
+    },
+    "scatter": {
+      "src": "scatter.svg",
+      "label": "Love letter",
+      "alt": "Love letter with a heart seal"
+    }
   }
 }

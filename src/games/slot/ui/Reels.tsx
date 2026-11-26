@@ -3,6 +3,7 @@
 import { useImperativeHandle, useLayoutEffect, useRef, type Ref } from "react";
 import { REELS, ROWS, STRIPS, type SymbolId } from "../config";
 import type { SymbolArtMap } from "./symbols";
+import { isFace } from "./faces";
 import styles from "./slot.module.css";
 
 /**
@@ -36,6 +37,12 @@ const cycleFor = (reel: number): SymbolId[] =>
   Array.from({ length: P }, (_, j) => STRIPS[reel][(reel * 11 + j) % STRIPS[reel].length]);
 const CYCLES = Array.from({ length: REELS }, (_, r) => cycleFor(r));
 const rowSymbol = (reel: number, row: number, col: SymbolId[]) => (row >= M && row < M + ROWS ? col[row - M] : CYCLES[reel][row % P]);
+
+/** face symbols render as cameos; the flag follows imperative src rewrites too */
+const markFace = (img: HTMLImageElement, id: SymbolId) => {
+  const cell = img.parentElement;
+  if (cell) cell.toggleAttribute("data-face", isFace(id));
+};
 
 const settledTransform = `translate3d(0, ${(-M / N) * 100}%, 0)`;
 const px = (rows: number, h: number) => `translate3d(0, ${-rows * h}px, 0)`;
@@ -76,6 +83,7 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
       if (img) {
         img.src = artRef.current[id].src;
         img.alt = "";
+        markFace(img, id);
       }
     }
     touched.current = [];
@@ -135,6 +143,7 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
             if (img) {
               img.src = artRef.current[id].src;
               img.alt = artRef.current[id].label;
+              markFace(img, id);
             }
           });
           for (const a of el.getAnimations()) a.cancel();
@@ -154,6 +163,7 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
           const img = imgs(target + i);
           if (img) {
             img.src = artRef.current[id].src;
+            markFace(img, id);
             touched.current.push({ reel, row: target + i });
           }
         });
@@ -201,6 +211,7 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
                   className={styles.cell}
                   data-win={win || undefined}
                   data-dim={(settled && dimLosers && !win) || undefined}
+                  data-face={isFace(id) || undefined}
                   aria-hidden={!settled}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- manifest art can be any format/aspect */}

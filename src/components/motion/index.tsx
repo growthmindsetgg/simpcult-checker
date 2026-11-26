@@ -1,17 +1,19 @@
 "use client";
 
-import { motion, useMotionValue, useSpring, useScroll, useReducedMotion, AnimatePresence, type Variants } from "motion/react";
-import { useCallback, useEffect, useRef, type CSSProperties, type ReactNode, type MouseEvent, type ComponentProps } from "react";
+import { motion, AnimatePresence, type Variants } from "motion/react";
+import { useEffect, type ReactNode, type MouseEvent, type ComponentProps } from "react";
+import { createPortal } from "react-dom";
+import { useMounted } from "@/lib/useMounted";
 
 export { motion, AnimatePresence };
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
-/* ── scroll reveal ─────────────────────────────────────────────── */
+/* ── scroll reveal (used sparingly: one reveal per section at most) ── */
 export function Reveal({
   children,
   delay = 0,
-  y = 14,
+  y = 12,
   className,
   once = true,
   as = "div",
@@ -31,7 +33,7 @@ export function Reveal({
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once, margin: "0px 0px -8% 0px" }}
-      transition={{ duration: 0.6, ease: EASE, delay }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
     >
       {children}
     </Tag>
@@ -41,11 +43,11 @@ export function Reveal({
 /* ── stagger container + items ────────────────────────────────── */
 export const stagger: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+  show: { transition: { staggerChildren: 0.05, delayChildren: 0.03 } },
 };
 export const item: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE } },
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } },
 };
 export function Stagger({ children, className, ...rest }: { children: ReactNode; className?: string } & ComponentProps<typeof motion.div>) {
   return (
@@ -62,170 +64,31 @@ export function Item({ children, className }: { children: ReactNode; className?:
   );
 }
 
-/* ── word-by-word headline reveal ─────────────────────────────── */
-export function SplitWords({ text, className, delay = 0 }: { text: string; className?: string; delay?: number }) {
-  const words = text.split(" ");
-  return (
-    <span className={className} aria-label={text}>
-      {words.map((w, i) => (
-        <span key={i} className="inline-block overflow-hidden pb-[0.08em] -mb-[0.08em] align-baseline">
-          <motion.span
-            className="inline-block"
-            initial={{ y: "110%", rotate: 4, opacity: 0 }}
-            animate={{ y: 0, rotate: 0, opacity: 1 }}
-            transition={{ duration: 0.9, ease: EASE, delay: delay + i * 0.07 }}
-          >
-            {w}
-          </motion.span>
-          {i < words.length - 1 && " "}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-/* ── magnetic wrapper (buttons lean toward the cursor) ─────────── */
-export function Magnetic({ children, strength = 0.35, className }: { children: ReactNode; strength?: number; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const x = useSpring(useMotionValue(0), { stiffness: 220, damping: 18, mass: 0.4 });
-  const y = useSpring(useMotionValue(0), { stiffness: 220, damping: 18, mass: 0.4 });
-  const reduce = useReducedMotion();
-  function move(e: MouseEvent) {
-    if (reduce || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    x.set((e.clientX - (r.left + r.width / 2)) * strength);
-    y.set((e.clientY - (r.top + r.height / 2)) * strength);
-  }
-  function leave() {
-    x.set(0);
-    y.set(0);
-  }
-  return (
-    <motion.div ref={ref} style={{ x, y }} onMouseMove={move} onMouseLeave={leave} className={`inline-block ${className ?? ""}`}>
-      {children}
-    </motion.div>
-  );
-}
-
-/* ── spotlight card: pointer spot + 3D tilt (max 6°) ─────────── */
+/* ── spotlight: a warm lamp follows the pointer (no tilt; tilting cards read as gimmicky) ── */
 export function Spotlight({
   children,
   className = "",
-  tilt = 6,
+  tilt: _tilt,
   ...rest
 }: { children: ReactNode; className?: string; tilt?: number | false } & ComponentProps<"div">) {
-  const enabled = tilt !== false;
-  const max = typeof tilt === "number" ? tilt : 6;
+  void _tilt;
   function move(e: MouseEvent<HTMLDivElement>) {
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
     el.style.setProperty("--mx", `${e.clientX - r.left}px`);
     el.style.setProperty("--my", `${e.clientY - r.top}px`);
-    if (!enabled) return;
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty("--ry", `${px * max * 2}deg`);
-    el.style.setProperty("--rx", `${-py * max * 2}deg`);
-    el.style.setProperty("--tz", `4px`);
   }
-  function leave(e: MouseEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    if (!enabled) return;
-    el.style.setProperty("--rx", `0deg`);
-    el.style.setProperty("--ry", `0deg`);
-    el.style.setProperty("--tz", `0px`);
-  }
-  // class list is stable across SSR/CSR — reduced-motion is honoured via the
-  // .tilt CSS `@media (prefers-reduced-motion: reduce)` rule in globals.css.
   return (
-    <div
-      className={`spot ${enabled ? "tilt" : ""} ${className}`}
-      onMouseMove={move}
-      onMouseLeave={leave}
-      {...rest}
-    >
+    <div className={`spot relative ${className}`} onMouseMove={move} {...rest}>
       {children}
     </div>
   );
 }
 
-/* ── scroll progress line ─────────────────────────────────────── */
-export function ScrollProgress() {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.3 });
-  return <motion.div className="scroll-progress" style={{ scaleX }} aria-hidden />;
-}
-
-/* ── 3D tilt on pointer (max 6°) ─────────────────────────────── */
-export function Tilt({
-  children,
-  className = "",
-  max = 6,
-  style,
-}: {
-  children: ReactNode;
-  className?: string;
-  max?: number;
-  style?: CSSProperties;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion();
-  const onMove = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (reduce || !ref.current) return;
-      const el = ref.current;
-      const r = el.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      el.style.setProperty("--ry", `${px * max * 2}deg`);
-      el.style.setProperty("--rx", `${-py * max * 2}deg`);
-      el.style.setProperty("--tz", `4px`);
-    },
-    [reduce, max],
-  );
-  const onLeave = useCallback(() => {
-    if (!ref.current) return;
-    ref.current.style.setProperty("--rx", `0deg`);
-    ref.current.style.setProperty("--ry", `0deg`);
-    ref.current.style.setProperty("--tz", `0px`);
-  }, []);
-  return (
-    <div ref={ref} className={`tilt ${className}`} style={style} onMouseMove={onMove} onMouseLeave={onLeave}>
-      {children}
-    </div>
-  );
-}
-
-/* ── press ripple: pass to onPointerDown ─────────────────────── */
-export function spawnRipple(e: React.PointerEvent<HTMLElement>) {
-  const el = e.currentTarget;
-  if (!el.classList.contains("ripple")) el.classList.add("ripple");
-  const r = el.getBoundingClientRect();
-  const size = Math.max(r.width, r.height) * 2.1;
-  const dot = document.createElement("span");
-  dot.className = "ripple-dot";
-  dot.style.width = dot.style.height = `${size}px`;
-  dot.style.left = `${e.clientX - r.left}px`;
-  dot.style.top = `${e.clientY - r.top}px`;
-  el.appendChild(dot);
-  setTimeout(() => dot.remove(), 700);
-}
-
-/* wrap children and forward the ripple to any child button/anchor */
-export function Ripple({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <span
-      className={`ripple ${className}`}
-      onPointerDown={(e) => spawnRipple(e as unknown as React.PointerEvent<HTMLElement>)}
-    >
-      {children}
-    </span>
-  );
-}
-
-/* ── modal shell with spring ──────────────────────────────────── */
+/* ── modal: a velvet panel over a dimmed room ─────────────────── */
+/* portalled to <body> so no ancestor (the nav, the mobile menu's clip-path) can clip or cover it */
 export function ModalShell({ open, onClose, children, className = "max-w-md" }: { open: boolean; onClose: () => void; children: ReactNode; className?: string }) {
-  // close on Escape
+  const mounted = useMounted();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -234,31 +97,33 @@ export function ModalShell({ open, onClose, children, className = "max-w-md" }: 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-[rgba(8,2,10,0.66)] p-4 backdrop-blur-md"
+          className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-[rgba(6,2,8,0.78)] p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          transition={{ duration: 0.2 }}
           onClick={onClose}
         >
           <motion.div
-            className={`glass max-h-[calc(100dvh-2rem)] w-full overflow-y-auto !rounded-[24px] !bg-bg-2/95 p-6 md:p-7 ${className}`}
+            className={`glass max-h-[calc(100dvh-2rem)] w-full overflow-y-auto !rounded-[var(--r-xl)] p-6 md:p-7 ${className}`}
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            initial={{ opacity: 0, y: 10, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.15 } }}
+            transition={{ duration: 0.26, ease: EASE }}
           >
             {children}
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

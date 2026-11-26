@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/cron/recheck", "schedule": "0 3 * * *" }]
+  "crons": [
+    { "path": "/api/cron/recheck", "schedule": "0 3 * * *" },
+    { "path": "/api/admin/points/holding", "schedule": "5 0 * * *" }
+  ]
 }

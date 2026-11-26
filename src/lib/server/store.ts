@@ -9,6 +9,19 @@ import { Redis } from "@upstash/redis";
  *    and Telegram links won't persist between invocations). Production
  *    refuses to start on it: `kv()` throws when the Upstash vars are missing.
  */
+/**
+ * Thrown (per request) when production has no Upstash credentials. Carries
+ * `code: "storage-unconfigured"` so route handlers can answer a clean 503
+ * instead of crashing. Points' own store throws the same error.
+ */
+export class StorageUnconfiguredError extends Error {
+  readonly code = "storage-unconfigured";
+  constructor() {
+    super("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN must be set in production");
+    this.name = "StorageUnconfiguredError";
+  }
+}
+
 export interface KV {
   get<T = string>(key: string): Promise<T | null>;
   set(key: string, value: unknown, ttlSec?: number): Promise<void>;
@@ -105,9 +118,7 @@ export function kv(): KV {
     globalThis.__simpKV = new UpstashKV(new Redis({ url, token }));
   } else {
     // called per request, never at import time, so `next build` is unaffected
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN must be set in production");
-    }
+    if (process.env.NODE_ENV === "production") throw new StorageUnconfiguredError();
     globalThis.__simpKV = new MemoryKV();
   }
   return globalThis.__simpKV;

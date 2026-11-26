@@ -38,7 +38,7 @@ function Body({ onClose }: { onClose: () => void }) {
 function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
   const labels = ["connect", "verify"];
   return (
-    <div className="mb-6 flex items-center gap-2 text-[11.5px] uppercase tracking-[0.14em] text-mute">
+    <div className="mb-6 flex items-center gap-2 font-serif text-[15px] italic text-mute">
       {labels.map((label, i) => {
         const idx = (i + 1) as 1 | 2;
         const active = step === idx;
@@ -46,8 +46,8 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
         return (
           <div key={label} className="flex items-center gap-2">
             <span
-              className={`grid h-6 w-6 place-items-center rounded-full text-[11px] font-semibold transition-colors ${
-                done ? "bg-ok/25 text-ok" : active ? "bg-simp/25 text-simp-2" : "bg-white/5 text-mute"
+              className={`mono grid h-6 w-6 place-items-center rounded-full not-italic text-[11px] font-semibold transition-colors ${
+                done ? "bg-ok/15 text-ok ring-1 ring-ok/40" : active ? "bg-gold text-ink" : "text-mute ring-1 ring-line-strong"
               }`}
               aria-current={active ? "step" : undefined}
             >
@@ -55,7 +55,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
             </span>
             <span className={done || active ? "text-text" : ""}>{label}</span>
             {i < labels.length - 1 && (
-              <span className="mx-1 h-px w-8 bg-line" aria-hidden />
+              <span className="mx-1 h-px w-8 bg-line-strong" aria-hidden />
             )}
           </div>
         );
@@ -103,15 +103,15 @@ function Connect() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={c.icon} alt="" className="h-7 w-7 rounded-md" />
             ) : (
-              <span className="grid h-7 w-7 place-items-center rounded-md bg-simp/20 text-simp-2">
+              <span className="grid h-7 w-7 place-items-center rounded-md bg-gold/15 text-gold">
                 <Icon name="wallet" className="h-4 w-4" />
               </span>
             )}
-            <span className="flex-1 text-sm font-medium">{c.name}</span>
+            <span className="flex-1 text-[15px] font-medium text-text">{c.name}</span>
             {isPending && variables?.connector === c ? (
-              <Icon name="spinner" className="h-4 w-4 text-simp-2" />
+              <Icon name="spinner" className="h-4 w-4 text-gold" />
             ) : (
-              <span className="text-xs text-mute">{c.type === "walletConnect" ? "qr / mobile" : "extension"}</span>
+              <span className="mono text-[11.5px] text-mute">{c.type === "walletConnect" ? "qr / mobile" : "extension"}</span>
             )}
           </button>
         ))}
@@ -285,7 +285,7 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
 function Header({ title, sub }: { title: string; sub: React.ReactNode }) {
   return (
     <div>
-      <h2 className="t-h2 text-[24px]">{title}</h2>
+      <h2 className="t-h2 text-[30px]">{title}</h2>
       <div className="mt-2 text-[13px] text-dim">{sub}</div>
     </div>
   );
@@ -293,7 +293,7 @@ function Header({ title, sub }: { title: string; sub: React.ReactNode }) {
 function SecurityNote() {
   return (
     <p className="mt-6 flex items-start gap-2.5 text-[12px] leading-relaxed text-mute">
-      <Icon name="shield" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-simp-2" />
+      <Icon name="shield" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
       <span>
         we never request token approvals. if a wallet prompt ever asks for <em>setApprovalForAll</em> or a
         different chain, reject it — it isn&apos;t us. run a simulation extension like pocket universe for an extra

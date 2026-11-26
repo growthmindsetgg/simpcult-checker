@@ -14,3 +14,10 @@ import "server-only";
  */
 export { getBalance, credit, debit, ledger, PointsError } from "./ledger";
 export type { LedgerEntry, Receipt, PointsErrorCode } from "./ledger";
+/**
+ * Production with no Upstash credentials throws an error with
+ * `code: "storage-unconfigured"` from any of the calls above. Answer it with
+ * a 503 (`{ code: "storage-unconfigured" }`) so the UI can show its
+ * "warming up" state instead of a crash.
+ */
+export { isStorageUnconfigured } from "./store";

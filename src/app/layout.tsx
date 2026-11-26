@@ -5,17 +5,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
-import { Ambient } from "@/components/Ambient";
 import { Toaster } from "@/components/Toast";
-import { GlobalRipple } from "@/components/GlobalRipple";
 import { SITE } from "@/lib/config";
-
-const michroma = localFont({
-  src: "./fonts/Michroma.woff2",
-  variable: "--font-display",
-  display: "swap",
-  weight: "400",
-});
 
 const inter = localFont({
   src: "./fonts/InterVariable.woff2",
@@ -24,8 +15,29 @@ const inter = localFont({
   weight: "100 900",
 });
 
+/* casino signage: Bodoni Moda, variable (opsz 6–96 + wght 400–900) */
+const bodoni = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource-variable/bodoni-moda/files/bodoni-moda-latin-standard-normal.woff2", style: "normal" },
+    { path: "../../node_modules/@fontsource-variable/bodoni-moda/files/bodoni-moda-latin-standard-italic.woff2", style: "italic" },
+  ],
+  variable: "--font-bodoni",
+  display: "swap",
+  weight: "400 900",
+  fallback: ["Didot", "Georgia", "serif"],
+});
+
+/* ledgers, tickets, numbers */
+const mono = localFont({
+  src: "../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2",
+  variable: "--font-mono",
+  display: "swap",
+  weight: "100 800",
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+});
+
 const NAME = "simp machine";
-const DESCRIPTION = "be an active simp, stack SIMP Points, feed them to the machine. the simp cult on monad.";
+const DESCRIPTION = "check in, post, bring alpha. stack SIMP Points and feed them to the machine. the simp cult on monad.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -37,22 +49,20 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: SITE.url,
     siteName: SITE.name,
-    images: [{ url: "/media/story-image.jpg" }],
+    images: [{ url: "/media/nft/simp-137.webp", width: 480, height: 480, alt: "simp cult #137" }],
   },
-  twitter: { card: "summary_large_image", site: "@monadsimpcult" },
+  twitter: { card: "summary", site: "@monadsimpcult" },
 };
 
-export const viewport: Viewport = { themeColor: "#0b0510", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#0a0610", colorScheme: "dark", viewportFit: "cover" };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const cookie = (await headers()).get("cookie");
   return (
-    <html lang="en" className={`${inter.variable} ${michroma.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${bodoni.variable} ${mono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <a href="#main" className="skip-link">skip to content</a>
         <Providers cookie={cookie}>
-          <Ambient />
-          <GlobalRipple />
           <Nav />
           <main id="main" className="flex flex-1 flex-col">{children}</main>
           <Footer />

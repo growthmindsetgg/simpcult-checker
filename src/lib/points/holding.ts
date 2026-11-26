@@ -66,6 +66,8 @@ export async function runHoldingAccrual(): Promise<HoldingRun> {
     } catch (e) {
       run.errors.push(`${owner}: ${e instanceof PointsError ? e.code : (e as Error).message}`);
       if (e instanceof PointsError && e.code === "pool_exhausted") break;
+      // a transient failure paid nothing: free these tokens so the next run pays them
+      await store().sremEach(K.holdingTokens(day), newTokens.map(String)).catch(() => {});
     }
   }
   await store().set(K.holdingRun(day), run, { ex: 60 * 60 * 24 * 7 });

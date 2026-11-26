@@ -1,19 +1,20 @@
-/** simp machine mark: a neon heart in a lit slot window */
-export function Logo({ className = "h-8 w-8" }: { className?: string }) {
+/**
+ * The wordmark: Bodoni, lowercase, with one small lit heart (the only neon in the nav).
+ * `Heart` is exported for reuse as the house glyph.
+ */
+export function Heart({ className = "h-2.5 w-2.5" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <defs>
-        <linearGradient id="logo-bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ff6ac3" />
-          <stop offset="1" stopColor="#e0238f" />
-        </linearGradient>
-      </defs>
-      <rect x="0.5" y="0.5" width="31" height="31" rx="10" fill="url(#logo-bg)" />
-      <rect x="0.5" y="0.5" width="31" height="31" rx="10" fill="none" stroke="rgba(255,255,255,.35)" />
-      <path
-        d="M16 24s-7-4.3-8.6-8.6C6.2 12.3 8 9 11.2 9c2 0 3.4 1.1 4.8 2.8C17.4 10.1 18.8 9 20.8 9 24 9 25.8 12.3 24.6 15.4 23 19.7 16 24 16 24Z"
-        fill="#1d0414"
-      />
+    <svg viewBox="0 0 16 14" className={className} aria-hidden>
+      <path d="M8 13.2S1 9 1 4.6C1 2.4 2.7.8 4.7.8c1.4 0 2.6.8 3.3 2 .7-1.2 1.9-2 3.3-2 2 0 3.7 1.6 3.7 3.8C15 9 8 13.2 8 13.2Z" fill="currentColor" />
     </svg>
+  );
+}
+
+export function Logo({ className = "" }: { className?: string }) {
+  return (
+    <span className={`wordmark ${className}`}>
+      <Heart className="wordmark-heart" />
+      <span>simp machine</span>
+    </span>
   );
 }

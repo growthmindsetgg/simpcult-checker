@@ -1,7 +1,10 @@
+import "@fontsource-variable/bodoni-moda";
+import "@fontsource-variable/bodoni-moda/wght-italic.css";
+import "@fontsource-variable/jetbrains-mono";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageHeader } from "@/components/PageHeader";
 import { GAMES } from "@/games/registry";
+import styles from "./hub.module.css";
 
 export const metadata: Metadata = {
   title: "games",
@@ -11,55 +14,59 @@ export const metadata: Metadata = {
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 export default function GamesHub() {
+  const live = GAMES.filter((g) => g.status === "live");
+  const soon = GAMES.filter((g) => g.status === "soon");
   return (
-    <section className="page max-w-5xl">
-      <PageHeader
-        title="games"
-        lead="your SIMP Points, put to work. every game is settled on the server, and every result can be checked."
-      />
+    <section className={styles.hub}>
+      <header className={styles.head}>
+        <p className={styles.kicker}>the back room</p>
+        <h1 className={styles.title}>games</h1>
+        <p className={styles.lead}>
+          your SIMP Points, put to work. every game is settled on the server, and every result can be checked.
+        </p>
+      </header>
 
-      <ul className="mt-10 grid gap-5 md:grid-cols-2">
-        {GAMES.map((g) =>
-          g.status === "live" ? (
-            <li key={g.id}>
-              <Link href={g.route} className="glass glass-hover flex h-full flex-col p-6 sm:p-7">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="pill pill-ok">live</span>
-                  <span className="num text-[13px] text-mute">
-                    {fmt(g.minBet)} to {fmt(g.maxBet)} points per {g.playUnit ?? "play"}
-                  </span>
-                </div>
+      <div className={styles.floor}>
+        {live.map((g) => (
+          <Link key={g.id} href={g.route} className={styles.feature}>
+            <div className={styles.featureArt} aria-hidden>
+              <span className={styles.featureSign}>table no. {String(GAMES.indexOf(g) + 1).padStart(2, "0")} · lit</span>
+              {g.preview && g.preview.length > 0 && (
+                <span className={styles.window}>
+                  {g.preview.slice(0, 3).map((src) => (
+                    <span key={src} className={styles.reel}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- symbol art, any format */}
+                      <img src={src} alt="" />
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+            <div className={styles.featureText}>
+              <span className={styles.plaque}>
+                {fmt(g.minBet)} – {fmt(g.maxBet)} points a {g.playUnit ?? "play"}
+              </span>
+              <h2 className={styles.name}>{g.name}</h2>
+              <p className={styles.tagline}>{g.tagline}</p>
+              <span className={styles.cta}>take a seat</span>
+            </div>
+          </Link>
+        ))}
 
-                {g.preview && g.preview.length > 0 && (
-                  <div className="mt-6 grid grid-cols-3 gap-2 rounded-[18px] bg-[#07020a] p-2 shadow-[inset_0_2px_12px_rgba(0,0,0,0.8),inset_0_0_0_1px_rgba(255,175,225,0.08)]">
-                    {g.preview.slice(0, 3).map((src) => (
-                      <div
-                        key={src}
-                        className="grid aspect-square place-items-center rounded-xl bg-[linear-gradient(180deg,#e6cfe0,#fff_50%,#e6cfe0)]"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- symbol art, any format */}
-                        <img src={src} alt="" className="h-[82%] w-[82%] object-contain" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <h2 className="t-wide mt-7 text-[20px] sm:text-[24px]">{g.name}</h2>
-                <p className="t-body mt-3">{g.tagline}</p>
-                <span className="btn btn-primary mt-6 self-start">play {g.name.toLowerCase()}</span>
-              </Link>
-            </li>
-          ) : (
-            <li key={g.id}>
-              <div className="flex h-full flex-col rounded-[var(--r-lg)] border border-dashed border-line-strong p-6 sm:p-7">
-                <span className="pill self-start">coming soon</span>
-                <h2 className="t-wide mt-7 text-[20px] text-dim sm:text-[24px]">{g.name}</h2>
-                <p className="t-body mt-3">{g.tagline}</p>
-              </div>
-            </li>
-          ),
-        )}
-      </ul>
+        <div className={styles.slips}>
+          {soon.map((g) => (
+            <div key={g.id} className={styles.slip}>
+              <span className={styles.stamp}>reserved</span>
+              <p className={styles.slipNo}>table no. {String(GAMES.indexOf(g) + 1).padStart(2, "0")}</p>
+              <h2 className={styles.slipName}>{g.name.toLowerCase()}</h2>
+              <p className={styles.slipText}>{g.tagline}</p>
+            </div>
+          ))}
+          <p className={styles.house}>
+            house rules: points only. the machine keeps a small edge, and tells you exactly how small.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }

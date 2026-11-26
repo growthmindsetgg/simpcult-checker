@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Icon } from "./Icon";
 
-/** tiny dep-free toast store — bottom-right, glass, auto-dismiss */
+/** tiny dep-free toast store: bottom-right cream slips, auto-dismiss */
 
 export type ToastTone = "info" | "ok" | "bad" | "warn";
 export type ToastItem = { id: number; tone: ToastTone; title: string; body?: string; ttl: number };
@@ -83,17 +83,17 @@ export function Toaster() {
             className="toast"
             data-tone={t.tone}
             role="status"
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 340, damping: 28, mass: 0.6 }}
+            initial={{ opacity: 0, y: 16, rotate: -1.5 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
+            exit={{ opacity: 0, y: 10, transition: { duration: 0.16 } }}
+            transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
           >
             <span className="toast-icon" aria-hidden>
               <Icon name={TONE_ICON[t.tone]} className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="font-semibold">{t.title}</div>
-              {t.body && <div className="mt-0.5 text-mute">{t.body}</div>}
+              <div className="toast-title">{t.title}</div>
+              {t.body && <div className="toast-body">{t.body}</div>}
             </div>
             <button
               className="toast-close"

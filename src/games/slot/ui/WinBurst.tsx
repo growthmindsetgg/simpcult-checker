@@ -43,7 +43,7 @@ export function WinBurst({ count }: { count: number }) {
         <svg key={i} className={styles.particle} viewBox="0 0 24 24" style={{ opacity: 0 }}>
           <path
             d="M12 21C6 16.5 3 13.2 3 9.6 3 7 5 5 7.5 5c1.8 0 3.3 1 4.5 2.6C13.2 6 14.7 5 16.5 5 19 5 21 7 21 9.6c0 3.6-3 6.9-9 11.4z"
-            fill={i % 3 === 0 ? "#ffd36e" : i % 3 === 1 ? "#ff4fd8" : "#b58cff"}
+            fill={i % 3 === 0 ? "#f6dc95" : i % 3 === 1 ? "#ff3fae" : "#d9a845"}
           />
         </svg>
       ))}

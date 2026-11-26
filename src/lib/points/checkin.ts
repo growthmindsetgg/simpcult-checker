@@ -1,6 +1,6 @@
 import "server-only";
 import { checkinReward, previousUtcDay, seasonAt, utcDay } from "./config";
-import { emit, normAddr, type Receipt } from "./ledger";
+import { emit, normAddr, PointsError, type Receipt } from "./ledger";
 import { store } from "./store";
 import { K } from "./keys";
 import { tokensOf } from "./chain";
@@ -46,12 +46,14 @@ export async function checkin(addr: string): Promise<Receipt & { streak: number 
   const tokens = await tokensOf(a);
   if (tokens.length === 0) throw new HttpError(403, "check-ins are for simp cult holders", "not_holder");
 
+  const ids = tokens.map(String);
   const fresh = await store().saddEach(
     K.checkinTokens(day),
-    tokens.map(String),
+    ids,
     60 * 60 * 50, // keep ~2 days
   );
-  if (!fresh.some(Boolean)) {
+  const mine = ids.filter((_, i) => fresh[i]);
+  if (mine.length === 0) {
     throw new HttpError(409, "your simps already checked in today from another wallet", "tokens_used");
   }
 
@@ -59,7 +61,16 @@ export async function checkin(addr: string): Promise<Receipt & { streak: number 
   const streak = prev && prev.last === previousUtcDay(day) ? prev.count + 1 : 1;
   const amount = checkinReward(season, streak);
 
-  const receipt = await emit("active", a, amount, "checkin", refFor(day), { streak, day });
+  let receipt: Receipt;
+  try {
+    receipt = await emit("active", a, amount, "checkin", refFor(day), { streak, day });
+  } catch (e) {
+    // a PointsError means the store refused it and nothing was paid: hand the
+    // tokens back so a retry today isn't told "already checked in from another
+    // wallet". Any other error may have paid, so the tokens stay used.
+    if (e instanceof PointsError) await store().sremEach(K.checkinTokens(day), mine).catch(() => {});
+    throw e;
+  }
   if (!receipt.duplicate) await store().set(K.streak(a), { last: day, count: streak });
   return { ...receipt, streak };
 }

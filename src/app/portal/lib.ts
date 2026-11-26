@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import type { LedgerEntry } from "@/lib/points/ledger";
 import type { Submission, SubmissionKind } from "@/lib/points/submissions";
 import type { PoolId } from "@/lib/points/config";
+import { ApiError } from "./api-error";
+import { FIXTURES_ENABLED, fixtureApi, readFixture } from "./fixtures";
 
+export { ApiError };
 export type { LedgerEntry, Submission, SubmissionKind, PoolId };
 
 export type Me = {
@@ -34,17 +37,24 @@ export type SeasonInfo = {
 
 export type LeaderRow = { rank: number; address: string; points: number };
 
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-  ) {
-    super(message);
-  }
+/** production with no storage / session secret yet: show "warming up" */
+export function isWarming(e: unknown): boolean {
+  return (
+    e instanceof ApiError &&
+    e.status === 503 &&
+    (e.code === "storage-unconfigured" || e.code === "session-unconfigured")
+  );
+}
+
+/** retry flaky network a little, but never auth refusals or the warm-up gate */
+export function retryPolicy(count: number, e: unknown): boolean {
+  if (e instanceof ApiError && [400, 401, 403, 404, 409, 429, 503].includes(e.status)) return false;
+  return count < 2;
 }
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  // dev-only design fixtures (?fixture=…); compiled out of production builds
+  if (FIXTURES_ENABLED && readFixture()) return fixtureApi<T>(url, init);
   const r = await fetch(url, {
     ...init,
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
@@ -75,11 +85,11 @@ export const KIND_LABEL: Record<SubmissionKind, string> = {
 
 export function reasonLabel(e: LedgerEntry): string {
   const r = e.reason;
-  if (r === "checkin") return `daily check-in${e.meta?.streak ? ` · ${e.meta.streak}-day streak` : ""}`;
+  if (r === "checkin") return `check-in${e.meta?.streak ? ` · day ${e.meta.streak}` : ""}`;
   if (r === "holding") return `holding · ${e.meta?.tokens ?? "?"} simp${e.meta?.tokens === 1 ? "" : "s"}`;
-  if (r === "x_post") return "x post approved";
-  if (r === "simp_post") return "simp post approved";
-  if (r === "alpha") return "alpha approved";
+  if (r === "x_post") return "x post paid";
+  if (r === "simp_post") return "simp post paid";
+  if (r === "alpha") return "alpha paid";
   if (r === "admin:grant") return `bonus${e.meta?.note ? ` · ${String(e.meta.note)}` : ""}`;
   if (r === "admin:revoke") return `correction${e.meta?.note ? ` · ${String(e.meta.note)}` : ""}`;
   if (r.startsWith("game:")) {
@@ -120,3 +130,11 @@ export function timeAgo(ts: number, now: number): string {
   if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86_400)}d ago`;
 }
+
+/** receipt-style UTC stamp: "11-26 03:12" */
+export function stamp(ts: number): string {
+  return new Date(ts).toISOString().slice(5, 16).replace("T", " ");
+}
+
+/** short slip number from a submission id: "a1b2c3" */
+export const slipNo = (id: string) => id.replace(/-/g, "").slice(0, 6);

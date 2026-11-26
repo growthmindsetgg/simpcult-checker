@@ -2,6 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { getSession, type Session } from "@/lib/server/session";
 import { PointsError } from "./ledger";
+import { isStorageUnconfigured } from "./store";
 
 /** route-handler helpers shared by /api/points/* and /api/admin/* */
 
@@ -21,7 +22,21 @@ export function ok(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers: NO_STORE });
 }
 
+/**
+ * Production without Upstash (or without SESSION_SECRET, e.g. a Vercel preview
+ * with no env vars): refuse cleanly with a 503 the portal and games can show
+ * as "the machine is warming up", never a crash.
+ */
+export function warmingUp(code: "storage-unconfigured" | "session-unconfigured") {
+  return NextResponse.json(
+    { error: "the machine is warming up — back soon", code },
+    { status: 503, headers: { ...NO_STORE, "retry-after": "300" } },
+  );
+}
+
 export function fail(e: unknown) {
+  if (isStorageUnconfigured(e)) return warmingUp("storage-unconfigured");
+  if (e instanceof HttpError && e.code === "session-unconfigured") return warmingUp("session-unconfigured");
   if (e instanceof HttpError) {
     return NextResponse.json({ error: e.message, code: e.code }, { status: e.status, headers: NO_STORE });
   }
@@ -69,7 +84,13 @@ export async function readJson<T>(req: Request): Promise<T> {
   return body;
 }
 
+/** mirrors the check in src/lib/server/session.ts, which throws a plain Error */
+function sessionConfigured(): boolean {
+  return process.env.NODE_ENV !== "production" || (process.env.SESSION_SECRET ?? "").length >= 32;
+}
+
 export async function requireSession(): Promise<Session> {
+  if (!sessionConfigured()) throw new HttpError(503, "sign-in is warming up", "session-unconfigured");
   const s = await getSession();
   if (!s) throw new HttpError(401, "connect and verify your wallet first", "no_session");
   return s;

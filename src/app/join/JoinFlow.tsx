@@ -179,15 +179,15 @@ function ProveOwnership({
       </p>
 
       {challenge ? (
-        <div className="rounded-2xl border border-line bg-[rgba(5,0,6,0.45)] p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="rounded-[var(--r-lg)] border border-line bg-[rgba(6,3,9,0.6)] p-3 sm:p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-[3px] bg-[linear-gradient(168deg,#f8efdd,var(--paper)_45%,var(--paper-2))] px-4 py-3.5 text-[var(--paper-ink)] shadow-[0_14px_30px_-16px_rgba(0,0,0,0.9)]">
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-mute">send exactly</div>
-              <div className="mono mt-1 text-[22px] text-white">
-                {challenge.amountMon} <span className="text-dim">MON</span>
+              <div className="font-serif text-[14px] italic text-[rgba(43,19,32,0.7)]">send exactly</div>
+              <div className="mono mt-1 text-[22px] font-semibold text-[var(--paper-ink)]">
+                {challenge.amountMon} <span className="text-[rgba(43,19,32,0.6)]">MON</span>
               </div>
             </div>
-            <div className="text-right text-[11px] text-mute">
+            <div className="mono text-right text-[11px] text-[rgba(43,19,32,0.65)]">
               <div>to {short(address)}</div>
               <div>expires in {remaining}</div>
             </div>
@@ -212,7 +212,7 @@ function ProveOwnership({
           </div>
 
           <details className="group mt-4 text-sm">
-            <summary className="cursor-pointer text-dim hover:text-white">i sent it manually (hardware wallet) ↓</summary>
+            <summary className="cursor-pointer text-dim hover:text-text">i sent it manually (hardware wallet)</summary>
             <div className="mt-3 space-y-2">
               <p className="text-xs text-dim">
                 already sent the exact amount from your wallet to itself? paste the tx hash — we&apos;ll verify from == to, value and the 15-minute window.
@@ -356,13 +356,13 @@ function SafetyAccordion() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3.5 text-left text-sm text-dim transition-colors hover:border-line-strong hover:text-text"
+        className="flex w-full items-center justify-between rounded-[var(--r-lg)] border border-line px-4 py-3.5 text-left text-sm text-dim transition-colors hover:border-line-strong hover:text-text"
         aria-expanded={open}
       >
         <span className="flex items-center gap-2">
-          <Icon name="shield" className="h-4 w-4 text-simp-2" /> how this stays safe
+          <Icon name="shield" className="h-4 w-4 text-gold" /> how this stays safe
         </span>
-        <span className={`text-simp-3 transition-transform duration-200 ${open ? "rotate-45" : ""}`} aria-hidden>+</span>
+        <span className={`text-gold transition-transform duration-200 ${open ? "rotate-45" : ""}`} aria-hidden>+</span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
@@ -373,7 +373,7 @@ function SafetyAccordion() {
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <ul className="mt-3 list-disc space-y-2 rounded-2xl border border-line bg-panel px-7 py-4 text-[13.5px] leading-relaxed text-dim marker:text-simp-4">
+            <ul className="glass mt-3 list-disc space-y-2 px-7 py-4 text-[13.5px] leading-relaxed text-dim marker:text-gold">
               <li><b className="text-text">no approvals, ever.</b> the only writes this site requests are dao propose/vote and your own self-transaction.</li>
               <li><b className="text-text">one chain.</b> wagmi is configured for monad (143) only — no silent chain switching.</li>
               <li><b className="text-text">readable signatures.</b> sign-in with ethereum names {SITE.domain}, your address and a single-use 5-min nonce.</li>
@@ -402,19 +402,19 @@ function StepCard({
 }) {
   return (
     <div
-      className={`glass relative p-6 ${active ? "pulse-neon" : ""}`}
+      className={`relative rounded-[var(--r-lg)] p-6 ${active ? "glass pulse-neon" : "border border-line"}`}
       aria-current={active ? "step" : undefined}
     >
       <div className="flex items-center gap-3">
         <span
-          className={`relative z-10 grid h-7 w-7 place-items-center rounded-full text-xs font-semibold transition-colors ${
-            done ? "bg-ok/20 text-ok" : active ? "bg-simp text-[#1d0414] shadow-[0_0_14px_rgb(var(--simp-rgb)/0.7)]" : "bg-bg-3 text-mute ring-1 ring-line"
+          className={`mono relative z-10 grid h-7 w-7 place-items-center rounded-full text-xs font-semibold transition-colors ${
+            done ? "bg-ok/15 text-ok ring-1 ring-ok/40" : active ? "bg-gold text-ink shadow-[0_0_14px_rgb(var(--gold-rgb)/0.5)]" : "bg-ink text-mute ring-1 ring-line-strong"
           }`}
           aria-hidden
         >
           {done ? <Icon name="check" className="h-3.5 w-3.5" /> : n}
         </span>
-        <h2 className={`t-h3 text-[17px] ${!active && !done ? "!text-mute" : ""}`}>{title}</h2>
+        <h2 className={`t-h3 text-[19px] ${!active && !done ? "!text-mute" : ""}`}>{title}</h2>
         {done && <span className="sr-only">(done)</span>}
       </div>
       <AnimatePresence initial={false}>

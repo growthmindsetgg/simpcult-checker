@@ -40,7 +40,12 @@ export function decodeSession(token?: string | null): Session | null {
   if (!token) return null;
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
-  const expect = sign(payload);
+  let expect: string;
+  try {
+    expect = sign(payload);
+  } catch {
+    return null; // no SESSION_SECRET (e.g. a preview deploy): treat everyone as signed out
+  }
   const a = Buffer.from(sig);
   const b = Buffer.from(expect);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;

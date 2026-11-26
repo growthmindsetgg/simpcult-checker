@@ -16,7 +16,8 @@ export async function seasonOverview(season = seasonAt()) {
   const stats = await store().hgetall(K.stats(s));
   return {
     season: s,
-    live: season >= 1,
+    /** this season is the one running right now */
+    live: season >= 1 && s === seasonAt(),
     start,
     end,
     pools,

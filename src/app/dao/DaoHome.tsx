@@ -57,7 +57,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       )}
 
       {DAO_DEPLOYED && cfg.data && cfg.data.period > 0 && (
-        <div className="mt-8 flex flex-wrap gap-x-7 gap-y-2 text-[13px] text-mute">
+        <div className="mono mt-8 flex flex-wrap gap-x-7 gap-y-2 text-[12.5px] text-mute">
           <span>quorum <b className="text-dim">{cfg.data.quorum} votes</b></span>
           <span>voting period <b className="text-dim">{Math.round(cfg.data.period / 3600)}h</b></span>
           <span>to propose <b className="text-dim">≥ {cfg.data.threshold} nft</b></span>
@@ -90,7 +90,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
 }
 
 function Empty({ text }: { text: string }) {
-  return <Item className="col-span-full"><div className="glass border-dashed p-10 text-center text-sm text-dim">{text}</div></Item>;
+  return <Item className="col-span-full"><div className="rounded-[var(--r-lg)] border border-dashed border-line-strong px-6 py-12 text-center font-serif text-[19px] italic text-dim">{text}</div></Item>;
 }
 
 function ArchiveCard({ a }: { a: ArchivedProposal }) {
@@ -111,7 +111,7 @@ function ArchiveCard({ a }: { a: ArchivedProposal }) {
           return (
             <div key={o.label}>
               <div className="mb-1 flex justify-between"><span className="text-dim">{o.label}</span><span>{o.votes} · {pct}%</span></div>
-              <div className="bar"><span style={{ width: `${pct}%`, background: "var(--simp)" }} /></div>
+              <div className="bar"><span style={{ width: `${pct}%`, background: "var(--gold)" }} /></div>
             </div>
           );
         })}

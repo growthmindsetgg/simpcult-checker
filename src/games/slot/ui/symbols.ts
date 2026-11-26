@@ -20,11 +20,19 @@ type Manifest = { version?: number; symbols?: Partial<Record<string, ManifestEnt
 /** Only plain relative file names (or absolute same-origin paths) are accepted. */
 const SAFE_SRC = /^(?:\/[\w\-./]+|[\w\-.]+(?:\/[\w\-.]+)*)\.(?:svg|png|webp|avif|jpe?g|gif)$/i;
 
+/** Mascots and the Monad mark only ship as the committed image tiles (no drawn stand-ins). */
+const DEFAULT_FILE: Partial<Record<SymbolId, string>> = {
+  chog: "mascot-chog.png",
+  molandak: "mascot-molandak.png",
+  moyaki: "mascot-moyaki.png",
+  monad: "logo-monad-logomark.png",
+};
+
 export function defaultArt(): SymbolArtMap {
   const out = {} as SymbolArtMap;
   for (const id of SYMBOL_IDS) {
     const name = SYMBOL_META[id].name;
-    out[id] = { src: `${SYMBOL_BASE}${id}.svg`, label: name, alt: name };
+    out[id] = { src: `${SYMBOL_BASE}${DEFAULT_FILE[id] ?? `${id}.svg`}`, label: name, alt: name };
   }
   return out;
 }

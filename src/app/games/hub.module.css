@@ -1,0 +1,284 @@
+/* The games hub: one lit machine, one reserved table. Casino printed matter. */
+
+.hub {
+  --ink: #0a0610;
+  --velvet: #2a0b1f;
+  --neon: #ff3fae;
+  --neon-hot: #ff8fd6;
+  --gold: #d9a845;
+  --gold-hi: #f6dc95;
+  --gold-lo: #7a5418;
+  --paper: #f1e4cc;
+  --paper-ink: #2a1620;
+  --f-display: "Bodoni Moda Variable", "Bodoni 72", Didot, Georgia, serif;
+  --f-mono: "JetBrains Mono Variable", ui-monospace, Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --noise-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --hairline: 0 0 0 1px var(--gold-lo), inset 0 0 0 1px rgb(246 220 149 / 0.2);
+
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 132px var(--gutter, 20px) 120px;
+  color: var(--paper);
+}
+
+.head {
+  max-width: 620px;
+}
+.kicker {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.title {
+  margin-top: 6px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(56px, 9vw, 104px);
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+  color: var(--paper);
+}
+.lead {
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: rgb(241 228 204 / 0.68);
+  text-wrap: pretty;
+}
+
+.floor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  margin-top: 56px;
+}
+
+/* the lit machine */
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--noise), linear-gradient(160deg, #3a0d2a, var(--velvet) 45%, #16050f);
+  box-shadow:
+    var(--hairline),
+    0 40px 90px -40px #000;
+  transition: box-shadow 0.3s var(--ease);
+}
+.featureArt {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 40px 24px;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, rgb(255 63 174 / 0.12), transparent 70%);
+}
+.featureSign {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.window {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 8px;
+  width: min(240px, 100%);
+  border-radius: 4px;
+  background: linear-gradient(150deg, var(--gold-hi), #b8862f 28%, var(--gold-lo) 52%, var(--gold) 78%, var(--gold-hi));
+  box-shadow: inset 0 1px 0 rgb(255 245 210 / 0.8), 0 3px 0 rgb(0 0 0 / 0.45);
+}
+.reel {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #a8967a, #f4ead6 30%, #fbf4e4 50%, #f4ead6 70%, #a8967a);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4);
+}
+.reel img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+.featureText {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 12px;
+  padding: 36px 32px 36px 8px;
+}
+.plaque {
+  padding: 3px 9px;
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #4a300a;
+  background: linear-gradient(180deg, #f3d891, #c99a3c 60%, #a07428);
+  text-shadow: 0 1px 0 rgb(255 240 200 / 0.55);
+  box-shadow:
+    inset 0 -1px 0 rgb(70 40 5 / 0.5),
+    0 1px 2px rgb(0 0 0 / 0.6);
+}
+.name {
+  font-family: var(--f-display);
+  font-weight: 650;
+  font-size: clamp(30px, 3.4vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+.tagline {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: rgb(241 228 204 / 0.7);
+  text-wrap: pretty;
+}
+.cta {
+  margin-top: 8px;
+  display: inline-grid;
+  place-items: center;
+  height: 52px;
+  padding: 0 28px 3px;
+  border-radius: 999px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 650;
+  font-size: 22px;
+  color: #2b0518;
+  background: radial-gradient(ellipse 80% 70% at 50% 30%, #ffd2ee 0%, var(--neon-hot) 28%, var(--neon) 68%, #d1188a 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 220 242 / 0.7),
+    0 0 0 4px rgb(255 63 174 / 0.14),
+    0 0 24px rgb(255 63 174 / 0.6);
+  transition:
+    transform 0.16s var(--ease),
+    box-shadow 0.24s var(--ease);
+}
+.feature:active .cta {
+  transform: scale(0.97);
+}
+.feature:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .feature:hover {
+    box-shadow:
+      0 0 0 1px var(--gold),
+      inset 0 0 0 1px rgb(246 220 149 / 0.3),
+      0 40px 90px -40px #000;
+  }
+  .feature:hover .cta {
+    box-shadow:
+      inset 0 0 0 1px rgb(255 230 246 / 0.85),
+      0 0 0 5px rgb(255 63 174 / 0.2),
+      0 0 34px rgb(255 63 174 / 0.8);
+  }
+}
+
+/* reserved tables: pit slips */
+.slips {
+  display: grid;
+  gap: 22px;
+  padding-top: 18px;
+}
+.slip {
+  position: relative;
+  padding: 22px 22px 20px;
+  background: var(--noise-paper), var(--paper);
+  color: var(--paper-ink);
+  transform: rotate(0.8deg);
+  box-shadow: 0 24px 50px -24px #000;
+}
+.slip::before,
+.slip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: radial-gradient(circle at 7px 50%, var(--ink) 3.2px, transparent 3.8px) 0 0 / 14px 8px repeat-x;
+}
+.slip::before {
+  top: -4px;
+}
+.slip::after {
+  bottom: -4px;
+}
+.stamp {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 2px 8px;
+  border: 1.5px solid #a3214f;
+  border-radius: 2px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a3214f;
+  opacity: 0.85;
+  transform: rotate(-6deg);
+}
+.slipNo {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #7a5262;
+}
+.slipName {
+  margin-top: 6px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.slipText {
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #563b49;
+}
+.house {
+  padding: 0 4px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.45;
+  color: rgb(241 228 204 / 0.55);
+}
+
+@media (max-width: 900px) {
+  .floor {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .hub {
+    padding-top: 112px;
+  }
+  .feature {
+    grid-template-columns: 1fr;
+  }
+  .featureText {
+    padding: 4px 22px 28px;
+  }
+  .featureArt {
+    padding: 32px 20px 24px;
+  }
+}

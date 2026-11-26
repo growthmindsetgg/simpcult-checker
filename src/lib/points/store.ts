@@ -1,5 +1,6 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
+import { StorageUnconfiguredError } from "@/lib/server/store";
 
 /**
  * Points storage. The shared `kv()` in src/lib/server/store.ts has no atomic
@@ -11,11 +12,28 @@ import { Redis } from "@upstash/redis";
  *     each `apply` runs to completion without interleaving). Production
  *     refuses it: `store()` throws when the Upstash vars are missing.
  *
- * Every key starts with the hash tag `{pts}` so multi-key scripts stay in one
- * slot on any Redis topology.
+ * Every key contains the hash tag `{pts}` so multi-key scripts stay in one
+ * slot on any Redis topology. `POINTS_KEY_PREFIX` (optional, letters, digits,
+ * `_ : -` only) is put in front of it — the Upstash test harness uses it to
+ * keep its keys apart. Unset = plain `{pts}` keys, as always.
  */
 
-export const P = "{pts}";
+function keyPrefix(): string {
+  const raw = process.env.POINTS_KEY_PREFIX ?? "";
+  if (!raw) return "";
+  if (!/^[\w:-]{1,64}$/.test(raw)) throw new Error("POINTS_KEY_PREFIX may only use letters, digits, _ : -");
+  return raw;
+}
+
+export const P = `${keyPrefix()}{pts}`;
+
+/** `code: "storage-unconfigured"` — see src/lib/server/store.ts */
+export { StorageUnconfiguredError };
+
+/** true for the production "no Upstash credentials" error, from any store */
+export function isStorageUnconfigured(e: unknown): boolean {
+  return !!e && typeof e === "object" && (e as { code?: unknown }).code === "storage-unconfigured";
+}
 
 export type ApplyArgs = {
   /** balance key */
@@ -71,6 +89,8 @@ export interface PointsStore {
   zcard(key: string): Promise<number>;
   /** returns how many members were newly added, per member, in order */
   saddEach(key: string, members: string[], ex?: number): Promise<boolean[]>;
+  /** removes members from a set (used to hand back a lock when a step fails) */
+  sremEach(key: string, members: string[]): Promise<void>;
   hgetall(key: string): Promise<Record<string, number>>;
   readonly persistent: boolean;
 }
@@ -116,7 +136,7 @@ return {1, bal, ''}
 
 const asString = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
 
-class UpstashStore implements PointsStore {
+export class UpstashStore implements PointsStore {
   readonly persistent = true;
   constructor(private r: Redis) {}
 
@@ -212,6 +232,9 @@ class UpstashStore implements PointsStore {
     const res = (await p.exec()) as unknown[];
     return members.map((_, i) => Number(res[i]) === 1);
   }
+  async sremEach(key: string, members: string[]) {
+    if (members.length > 0) await this.r.srem(key, ...members);
+  }
   async hgetall(key: string) {
     const h = (await this.r.hgetall<Record<string, number | string>>(key)) ?? {};
     return Object.fromEntries(Object.entries(h).map(([k, v]) => [k, Number(v)]));
@@ -222,7 +245,7 @@ class UpstashStore implements PointsStore {
 
 type Entry = { v: unknown; exp: number };
 
-class MemoryStore implements PointsStore {
+export class MemoryStore implements PointsStore {
   readonly persistent = false;
   private m = new Map<string, Entry>();
 
@@ -247,9 +270,11 @@ class MemoryStore implements PointsStore {
     }
     return z;
   }
+  /** Redis order: by score, ties by member bytes — both reversed for ZREV* */
   private sorted(k: string, rev: boolean) {
     const z = this.read<Map<string, number>>(k) ?? new Map<string, number>();
-    return [...z.entries()].sort((a, b) => (rev ? b[1] - a[1] : a[1] - b[1]) || a[0].localeCompare(b[0]));
+    const lex = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+    return [...z.entries()].sort((a, b) => (rev ? b[1] - a[1] || lex(b[0], a[0]) : a[1] - b[1] || lex(a[0], b[0])));
   }
 
   async apply(a: ApplyArgs): Promise<ApplyResult> {
@@ -358,6 +383,10 @@ class MemoryStore implements PointsStore {
       return true;
     });
   }
+  async sremEach(key: string, members: string[]) {
+    const s = this.read<Set<string>>(key);
+    if (s) for (const m of members) s.delete(m);
+  }
   async hgetall(key: string) {
     return { ...(this.read<Record<string, number>>(key) ?? {}) };
   }
@@ -375,9 +404,8 @@ export function store(): PointsStore {
     globalThis.__simpPointsStore = new UpstashStore(new Redis({ url, token }));
   } else {
     // called per request, never at import time, so `next build` is unaffected
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN must be set in production");
-    }
+    // production refuses to run on memory; routes turn this into a 503
+    if (process.env.NODE_ENV === "production") throw new StorageUnconfiguredError();
     globalThis.__simpPointsStore = new MemoryStore();
   }
   return globalThis.__simpPointsStore;

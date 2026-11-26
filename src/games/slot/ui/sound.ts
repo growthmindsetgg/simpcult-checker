@@ -108,6 +108,7 @@ export const sfx = {
   anticipation(dur: number) {
     tone(260, 0, dur, "sawtooth", 0.05, 980);
     tone(390, 0, dur, "triangle", 0.06, 1470);
+    for (let t = 0; t < dur - 0.1; t += 0.28) tone(70, t, 0.12, "sine", 0.22, 50); // heartbeat under the riser
   },
   win(tier: "nice" | "big" | "mega") {
     const notes = tier === "nice" ? [659, 784, 988] : tier === "big" ? [523, 659, 784, 1047, 1319] : [523, 659, 784, 1047, 784, 1047, 1319, 1568];
@@ -122,6 +123,28 @@ export const sfx = {
   },
   countTick() {
     tone(1400 + Math.random() * 300, 0, 0.03, "sine", 0.04);
+  },
+  /** the lever: a ratchet click on the way down, a heavy clunk when it bottoms out */
+  lever() {
+    noiseBurst(0, 0.05, 3200, 3, 0.12);
+    noiseBurst(0.07, 0.04, 2800, 3, 0.1);
+    tone(92, 0.2, 0.22, "sine", 0.55, 48);
+    noiseBurst(0.2, 0.09, 900, 1.4, 0.25);
+  },
+  /** one symbol passing the window (the 3D reels call this, rate-limited) */
+  reelTick(i = 0) {
+    noiseBurst(0, 0.018, 4200 - i * 300, 6, 0.05);
+  },
+  /** coins pouring into the tray; length scales with the win */
+  coinShower(tier: "big" | "mega") {
+    const n = tier === "mega" ? 34 : 18;
+    for (let k = 0; k < n; k++) {
+      const at = 0.05 + (k / n) * (tier === "mega" ? 2.2 : 1.3) + Math.random() * 0.05;
+      const f = 2200 + Math.random() * 2600;
+      tone(f, at, 0.09, "sine", 0.05 + Math.random() * 0.04, f * 0.92);
+      tone(f * 1.51, at + 0.004, 0.06, "sine", 0.025);
+    }
+    noiseBurst(0.05, tier === "mega" ? 2.4 : 1.5, 5200, 0.7, 0.035);
   },
   error() {
     tone(220, 0, 0.12, "square", 0.05, 160);
