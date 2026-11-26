@@ -5,10 +5,12 @@
  * singletons per quality tier; only the Object3D tree is per instance.
  */
 import {
+  CanvasTexture,
   CapsuleGeometry,
   CircleGeometry,
   Color,
   ExtrudeGeometry,
+  Float32BufferAttribute,
   Group,
   LatheGeometry,
   Matrix4,
@@ -17,13 +19,14 @@ import {
   MeshPhysicalMaterial,
   PointLight,
   Quaternion,
+  RepeatWrapping,
   Shape,
   SphereGeometry,
   SplineCurve,
   TorusGeometry,
   Vector2,
   Vector3,
-  type BufferGeometry,
+  BufferGeometry,
   type Material,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -52,6 +55,63 @@ function fabric(color: string, sheen: string, extra: Partial<ConstructorParamete
   });
 }
 
+/**
+ * Fine strand texture for the hair, drawn in code: a height field of short
+ * overlapping strokes running down the strands, turned into a normal map so
+ * the sheen breaks into hair instead of a smooth helmet highlight.
+ */
+function hairStrandMap() {
+  if (typeof document === "undefined") return null;
+  const N = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  g.fillStyle = "#808080";
+  g.fillRect(0, 0, N, N);
+  g.lineCap = "round";
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 1400; i++) {
+    const x = rnd() * N;
+    const y = rnd() * N;
+    const len = 10 + rnd() * 26;
+    const tilt = (rnd() - 0.5) * 0.35;
+    const v = Math.round(60 + rnd() * 140);
+    g.strokeStyle = `rgba(${v},${v},${v},0.55)`;
+    g.lineWidth = 1 + rnd() * 2.2;
+    for (const dx of [-N, 0, N]) {
+      for (const dy of [-N, 0, N]) {
+        g.beginPath();
+        g.moveTo(x + dx, y + dy);
+        g.lineTo(x + dx + Math.sin(tilt) * len, y + dy + Math.cos(tilt) * len);
+        g.stroke();
+      }
+    }
+  }
+  const src = g.getImageData(0, 0, N, N).data;
+  const out = g.createImageData(N, N);
+  const h = (x: number, y: number) => src[(((y + N) % N) * N + ((x + N) % N)) * 4] / 255;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = (h(x + 1, y) - h(x - 1, y)) * 2.2;
+      const dy = (h(x, y + 1) - h(x, y - 1)) * 2.2;
+      const l = Math.hypot(dx, dy, 1);
+      const o = (y * N + x) * 4;
+      out.data[o] = (-dx / l) * 127 + 128;
+      out.data[o + 1] = (dy / l) * 127 + 128;
+      out.data[o + 2] = (1 / l) * 127 + 128;
+      out.data[o + 3] = 255;
+    }
+  }
+  g.putImageData(out, 0, 0);
+  const t = new CanvasTexture(c);
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.repeat.set(3, 1.6);
+  t.anisotropy = 4;
+  return t;
+}
+
 let mats: ReturnType<typeof makeMaterials> | null = null;
 function makeMaterials() {
   return {
@@ -59,15 +119,17 @@ function makeMaterials() {
     skin: vinyl("#e2b48f", { roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.4, sheen: 0.25, sheenColor: new Color("#ffdcc4") }),
     skinShade: vinyl("#c99272", { roughness: 0.55, clearcoat: 0.25 }),
     stubble: new MeshPhysicalMaterial({ color: new Color("#c7a085"), roughness: 0.85 }),
-    // matte jet-black hair with a faint blue-black sheen
+    // near-black hair: a soft cool sheen on the crown and a satin coat, never a plastic shine
     hair: new MeshPhysicalMaterial({
-      color: new Color("#050507"),
-      roughness: 0.7,
-      sheen: 0.25,
-      sheenColor: new Color("#1d2a48"),
-      sheenRoughness: 0.45,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.6,
+      normalMap: hairStrandMap(),
+      normalScale: new Vector2(1.3, 1.3),
+      color: new Color("#0c0b0f"),
+      roughness: 0.62,
+      sheen: 0.6,
+      sheenColor: new Color("#3b4058"),
+      sheenRoughness: 0.55,
+      clearcoat: 0.15,
+      clearcoatRoughness: 0.5,
     }),
     brow: new MeshPhysicalMaterial({ color: new Color("#141218"), roughness: 0.75 }),
     tee: fabric("#18181c", "#50525e"),
@@ -126,9 +188,8 @@ export const HEAD_PROFILE: [number, number][] = [
 ];
 export const HEAD_WIDTH = 1.1; // x stretch: the face is a little wider than tall
 export const HEAD_DEPTH = 0.92; // z squash
-/** hairline: front (above the forehead) and sides (just above the ears) */
+/** hairline above the forehead (the rest of the line is HAIRLINE_KEYS) */
 const HAIRLINE = 0.118;
-const SIDE_LINE = 0.042;
 /** face part heights (head-mesh local), shared with the controller */
 export const FACE = { browY: 0.056, eyeY: 0.0 } as const;
 
@@ -154,70 +215,207 @@ const hash = (n: number) => {
   return x - Math.floor(x);
 };
 
+/** smoothstep */
+const sstep = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
 /**
- * Short, thick, textured crop: many small tapered spikes clustered over the
- * cap, pushed up and forward, with a short tousled fringe. Merged into one
- * geometry (one draw call), in head-mesh local space.
+ * Hairline height (head-mesh local y) around the head. az is the azimuth from
+ * the face (0) round to the nape (±π): high over the forehead, dipping over
+ * the ears, down to the nape at the back.
  */
-function spikyHair(segs: number, radial: number) {
-  const spike = lathe(
+const HAIRLINE_KEYS: [number, number][] = [
+  [0, HAIRLINE],
+  [0.55, 0.112],
+  [0.95, 0.09],
+  [1.3, 0.062],
+  [1.62, 0.05],
+  [2.0, 0.0],
+  [2.45, -0.09],
+  [Math.PI, -0.13],
+];
+function hairlineY(az: number) {
+  const a = Math.abs(az);
+  const k = HAIRLINE_KEYS;
+  for (let i = 0; i < k.length - 1; i++) {
+    if (a <= k[i + 1][0]) {
+      const t = sstep(k[i][0], k[i + 1][0], a);
+      return k[i][1] + (k[i + 1][1] - k[i][1]) * t;
+    }
+  }
+  return k[k.length - 1][1];
+}
+
+/** soft clumps over the crown and front, so the crop reads textured rather than a smooth helmet */
+const CLUMPS = Array.from({ length: 70 }, (_, i) => ({
+  az: (hash(i + 900) - 0.5) * 2 * 2.9,
+  y: 0.02 + hash(i + 950) * 0.22,
+  h: 0.0035 + hash(i + 990) * 0.005,
+  r: 0.02 + hash(i + 1030) * 0.012,
+}));
+
+/**
+ * The hair as one solid mass sitting on the skull: a displaced shell from the
+ * hairline to the crown. Thick on top and at the front (pushed up and
+ * forward, with a short fringe lip over the forehead), close-cropped on the
+ * sides and back. Writes the surface point and outward direction for
+ * (az, v) so the nubs can sit on it.
+ */
+function hairSurface(az: number, v: number, out: Vector3, dir: Vector3) {
+  const hl = hairlineY(az);
+  const y0 = hl + (0.238 - hl) * v;
+  const r = profileRadius(Math.min(0.2379, y0));
+  out.set(HEAD_WIDTH * r * Math.sin(az), y0, HEAD_DEPTH * r * Math.cos(az));
+  dir.set(out.x / HEAD_WIDTH, out.y + 0.03, out.z / HEAD_DEPTH).normalize();
+
+  const a = Math.abs(az);
+  // near the crown every azimuth meets at one point: fade the per-azimuth shaping out there,
+  // or the pole folds into a peak
+  const pole = sstep(0.72, 1, v);
+  const front = (1 - sstep(0.7, 1.25, a)) * (1 - pole) + 0.45 * pole; // the face side
+  const back = sstep(1.9, 2.6, a) * (1 - pole) + 0.3 * pole;
+  // close crop: sides thinnest, the back a little fuller; the front is the fringe
+  const close = 0.0045 + 0.004 * back + 0.026 * front;
+  const top = 0.03;
+  let t = close + (top - close) * sstep(0.1, 0.2, y0);
+  // the shell thins to a crisp edge at the hairline on the sides, stays blunt at the fringe
+  const rise = y0 - hl;
+  t *= 0.45 + 0.55 * sstep(0, 0.035 + 0.02 * (1 - front), rise) + 0.3 * front * (1 - sstep(0, 0.02, rise));
+  for (const c of CLUMPS) {
+    const d2 = ((az - c.az) * r * 1.05) ** 2 + (y0 - c.y) ** 2;
+    // every clump near the top lands on the pole (azimuth stops mattering there), so they would stack into a peak
+    t += c.h * Math.exp(-d2 / (c.r * c.r)) * (1 - 0.5 * back) * sstep(0, 0.03, rise) * (1 - pole);
+  }
+  // strand groups: shallow sculpted grooves from the crown down to the hairline, a little wavy
+  const wob = 0.35 * Math.sin(y0 * 38 + az * 2.3) + 0.25 * Math.sin(az * 5.1 + 1.7);
+  const ridge = Math.pow(Math.abs(Math.sin(az * 13 + wob)), 0.7);
+  const ra = (0.0055 + 0.002 * front) * sstep(0, 0.03, rise) * (0.6 + 0.4 * sstep(0.04, 0.15, y0));
+  t += ra * (ridge - 0.5) * (1 - pole);
+  out.addScaledVector(dir, t);
+  // pushed up and forward: the top mass leans toward the face
+  const lift = sstep(0.08, 0.2, y0) * (1 - back * 0.7);
+  out.y += 0.006 * lift;
+  out.z += 0.012 * lift + 0.004 * front;
+  // the fringe: the front edge overhangs the forehead a little and dips
+  const fringe = front * (1 - sstep(0, 0.045, rise));
+  out.z += 0.012 * fringe;
+  out.y -= (0.006 + 0.012 * ridge) * fringe; // the edge breaks into short blunt locks
+}
+
+function hairShell(nAz: number, nV: number) {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const p = new Vector3();
+  const d = new Vector3();
+  for (let j = 0; j <= nV; j++) {
+    const v = Math.pow(j / nV, 1.15);
+    for (let i = 0; i < nAz; i++) {
+      hairSurface(-Math.PI + (i / nAz) * Math.PI * 2, v, p, d);
+      pos.push(p.x, p.y, p.z);
+      // u runs round the head, v down the strands: the strand normal map's strokes follow v
+      uv.push(i / nAz, p.y * 2.2);
+    }
+  }
+  // a skirt row tucked into the skull under the edge, so no gap shows at the hairline
+  for (let i = 0; i < nAz; i++) {
+    const az = -Math.PI + (i / nAz) * Math.PI * 2;
+    const hl = hairlineY(az) - 0.004;
+    const r = profileRadius(hl) - 0.004;
+    pos.push(HEAD_WIDTH * r * Math.sin(az), hl, HEAD_DEPTH * r * Math.cos(az));
+    uv.push(i / nAz, hl * 2.2);
+  }
+  const skirt = nV + 1;
+  const row = (j: number) => (j < 0 ? skirt : j);
+  for (let j = -1; j < nV; j++) {
+    for (let i = 0; i < nAz; i++) {
+      const i1 = (i + 1) % nAz;
+      const a = row(j) * nAz + i;
+      const b = row(j) * nAz + i1;
+      const c = (j + 1) * nAz + i;
+      const e = (j + 1) * nAz + i1;
+      idx.push(a, b, c, b, e, c);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Short blunt nubs merged into the mass: dense over the crown and front,
+ * mostly sunk so only rounded tips show, all leaning up and forward, plus a
+ * row of fringe tips over the forehead. One geometry, head-mesh local.
+ */
+function hairNubs(segs: number, radial: number, count: number) {
+  const nub = lathe(
     [
-      [0, -0.4],
-      [1, -0.08],
-      [0.88, 0.28],
-      [0.58, 0.62],
-      [0.26, 0.9],
+      [0, -0.6],
+      [1, -0.25],
+      [0.96, 0.15],
+      [0.74, 0.55],
+      [0.42, 0.86],
       [0, 1],
     ],
     segs,
     radial,
   );
-  const rings: { y: number; n: number; az: number; s: number; len: number }[] = [
-    { y: HAIRLINE + 0.002, n: 13, az: 1.1, s: 0.03, len: 0.036 }, // fringe
-    { y: 0.138, n: 19, az: Math.PI, s: 0.033, len: 0.04 },
-    { y: 0.16, n: 19, az: Math.PI, s: 0.034, len: 0.042 },
-    { y: 0.181, n: 17, az: Math.PI, s: 0.034, len: 0.044 },
-    { y: 0.2, n: 14, az: Math.PI, s: 0.034, len: 0.045 },
-    { y: 0.216, n: 10, az: Math.PI, s: 0.033, len: 0.044 },
-    { y: 0.228, n: 6, az: Math.PI, s: 0.032, len: 0.042 },
-    { y: 0.236, n: 2, az: Math.PI, s: 0.03, len: 0.04 },
-  ];
   const parts: BufferGeometry[] = [];
   const m = new Matrix4();
   const q = new Quaternion();
   const pos = new Vector3();
+  const nrm = new Vector3();
   const scl = new Vector3();
   const dir = new Vector3();
   const up = new Vector3(0, 1, 0);
-  let k = 0;
-  rings.forEach((ring, ri) => {
-    const full = ring.az >= Math.PI;
-    for (let i = 0; i < ring.n; i++) {
-      k++;
-      const t = full ? i / ring.n : ring.n === 1 ? 0.5 : i / (ring.n - 1);
-      let az = full ? t * Math.PI * 2 + ri * 0.37 : -ring.az + t * 2 * ring.az;
-      az += (hash(k) - 0.5) * (full ? 0.22 : 0.12);
-      const y = ring.y + (hash(k + 50) - 0.5) * 0.008;
-      const r = profileRadius(y) - 0.003; // sunk a little: one thick mass, tips poking out
-      const sx = Math.sin(az);
-      const cz = Math.cos(az);
-      pos.set(HEAD_WIDTH * r * sx, y, HEAD_DEPTH * r * cz);
-      // rough outward normal, pushed up and toward the front; the fringe tips forward
-      const fringe = ri === 0;
-      dir.set(sx * (fringe ? 0.3 : 0.45), fringe ? 0.7 : 0.95 + ri * 0.05, cz * (fringe ? 0.85 : 0.3) + (fringe ? 0.25 : 0.5));
-      dir.x += (hash(k + 100) - 0.5) * 0.45;
-      dir.z += (hash(k + 150) - 0.5) * 0.3;
-      dir.normalize();
-      q.setFromUnitVectors(up, dir);
-      const sz = ring.s * (0.85 + hash(k + 200) * 0.3);
-      const len = ring.len * (0.75 + hash(k + 250) * 0.55);
-      scl.set(sz, len, sz * 0.9);
-      parts.push(spike.clone().applyMatrix4(m.compose(pos, q, scl)));
+  const fw = new Vector3();
+  const place = (az: number, v: number, k: number, fringe: boolean) => {
+    hairSurface(az, v, pos, nrm);
+    if (fringe) {
+      // fringe locks: forward and a little down over the forehead
+      dir.set(Math.sin(az) * 0.3, -0.22, 1);
+    } else {
+      // swept forward along the surface, lifted off it: short locks pushed up and forward
+      fw.set(Math.sin(az) * 0.15, 0.25, 1);
+      fw.addScaledVector(nrm, -fw.dot(nrm)).normalize();
+      const lift = 0.42 + hash(k + 300) * 0.35;
+      dir.copy(fw).multiplyScalar(Math.cos(lift)).addScaledVector(nrm, Math.sin(lift));
     }
-  });
+    dir.x += (hash(k + 100) - 0.5) * 0.3;
+    dir.y += (hash(k + 150) - 0.5) * 0.15;
+    dir.normalize();
+    q.setFromUnitVectors(up, dir);
+    const base = fringe ? 0.02 : 0.02 + hash(k + 200) * 0.008;
+    const len = fringe ? 0.028 + hash(k + 250) * 0.008 : 0.034 + hash(k + 250) * 0.016;
+    scl.set(base, len, base * 0.7);
+    pos.addScaledVector(dir, -0.28 * len).addScaledVector(nrm, -0.004);
+    parts.push(nub.clone().applyMatrix4(m.compose(pos, q, scl)));
+  };
+  // fringe tips along the front hairline
+  const nf = Math.round(count * 0.12);
+  for (let i = 0; i < nf; i++) {
+    const az = -0.82 + (i / (nf - 1)) * 1.64 + (hash(i + 700) - 0.5) * 0.06;
+    place(az, 0.025 + hash(i + 720) * 0.03, i + 700, true);
+  }
+  // the crown and front: golden-angle scatter over the top of the mass
+  for (let i = 0; i < count - nf; i++) {
+    const t = (i + 0.5) / (count - nf);
+    const az = ((i * 2.39996) % (Math.PI * 2)) - Math.PI;
+    const a = Math.abs(az);
+    const v = 0.14 + Math.sqrt(t) * 0.8;
+    // locks only on the front half (they make the up-and-forward silhouette); the crown and back
+    // carry their texture in the sculpted grooves, so from behind it reads as a crop, not scales
+    if (a > 1.45 || (a > 1.0 && v < 0.5)) continue;
+    place(az, v, i + 1, false);
+  }
   const merged = mergeGeometries(parts);
   parts.forEach((g) => g.dispose());
-  spike.dispose();
+  nub.dispose();
   return merged;
 }
 
@@ -252,33 +450,9 @@ function makeGeometry(q: Quality) {
     head: lathe(HEAD_PROFILE, lseg, lrad),
     sphere: new SphereGeometry(1, sw, sh),
     sphereLo: new SphereGeometry(1, hi ? 16 : 10, hi ? 12 : 8),
-    // hair cap: the skull's own profile above the hairline, a few mm proud of it
-    hairCap: lathe(
-      [
-        [profileRadius(HAIRLINE) + 0.001, HAIRLINE - 0.004],
-        [profileRadius(HAIRLINE) + 0.006, HAIRLINE + 0.006],
-        ...HEAD_PROFILE.filter(([, y]) => y > HAIRLINE + 0.03).map(([r, y]) => [r === 0 ? 0 : r + 0.006, y + 0.006] as [number, number]),
-      ],
-      lseg,
-      lrad,
-      false,
-    ),
-    // short sides and back: a close band from just above the ears up to the cap (open at the forehead)
-    hairBand: lathe(
-      [
-        [profileRadius(SIDE_LINE) + 0.001, SIDE_LINE - 0.004],
-        [profileRadius(SIDE_LINE) + 0.005, SIDE_LINE + 0.004],
-        [profileRadius(0.08) + 0.006, 0.08],
-        [profileRadius(HAIRLINE + 0.012) + 0.006, HAIRLINE + 0.012],
-      ],
-      hi ? 8 : 5,
-      lrad,
-      false,
-      false,
-      0.95,
-      Math.PI * 2 - 1.9,
-    ),
-    spikes: spikyHair(hi ? 6 : 4, hi ? 7 : 5),
+    // hair: one solid shell plus blunt nubs merged into it
+    hair: hairShell(hi ? 130 : 80, hi ? 28 : 16),
+    hairNubs: hairNubs(hi ? 6 : 4, hi ? 8 : 6, hi ? 150 : 100),
     thigh: new CapsuleGeometry(D.thighR, D.thigh, cap, rad),
     shin: new CapsuleGeometry(D.shinR, D.shin - 0.02, cap, rad),
     upperArm: new CapsuleGeometry(D.upperArmR, D.upperArm, cap, rad),
@@ -462,13 +636,11 @@ function buildHead(head: Group, G: KeoneGeometry, M: KeoneMaterials, cast: Mesh[
     inner.position.set(s * HEAD_WIDTH * 0.247, -0.012, -0.004);
   }
 
-  // hair: close sides, a cap, and a mass of short spikes pushed up and forward
-  const cap = mesh(G.hairCap, M.hair, c, cast);
-  cap.scale.set(HEAD_WIDTH, 1, HEAD_DEPTH);
-  const band = mesh(G.hairBand, M.hair, c, cast);
-  band.scale.set(HEAD_WIDTH, 1, HEAD_DEPTH);
-  const spikes = mesh(G.spikes, M.hair, c, cast);
-  spikes.name = "hairSpikes";
+  // hair: a solid crop (close sides, thick top pushed up and forward, short fringe) with blunt nubs for texture
+  const hair = mesh(G.hair, M.hair, c, cast);
+  hair.name = "hair";
+  const nubs = mesh(G.hairNubs, M.hair, c, cast);
+  nubs.name = "hairNubs";
   // face parts, seated on the head surface (normal from the stretched ellipse)
   const onFace = (o: Group | Mesh, x: number, y: number, out = 0) => {
     o.position.set(x, y, headFrontZ(x, y) + out);
@@ -586,7 +758,7 @@ export function buildKeone(q: Quality): KeoneRig {
 
   // a soft warm fill in front of and above the face so he reads true in the neon room,
   // plus a faint cool rim from behind (high tier). Parented to the chest so they follow the lean.
-  const fill = new PointLight("#ffdcc0", 0.95, 1.2, 2);
+  const fill = new PointLight("#ffdcc0", 0.7, 1.2, 2);
   fill.position.set(0, 0.4, 0.6); // aimed at the face more than the hair
   fill.name = "keoneFill";
   chest.add(fill);

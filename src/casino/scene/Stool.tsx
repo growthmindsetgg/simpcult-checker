@@ -1,7 +1,11 @@
 "use client";
-/** Brass-and-velvet stool at ANCHORS.stool; seat top at SEAT_HEIGHT. */
+/**
+ * Brass-and-velvet stool at ANCHORS.stool; seat top at SEAT_HEIGHT. A brass
+ * footring sits where Keone's seated soles land (FOOTRING in character/dims).
+ */
 import { useMemo } from "react";
 import { Color, MeshPhysicalMaterial, MeshStandardMaterial } from "three";
+import { FOOTRING } from "../character/dims";
 import { ANCHORS, SEAT_HEIGHT } from "../contract";
 import { C } from "./palette";
 
@@ -9,6 +13,8 @@ export function Stool({ shadows }: { shadows: boolean }) {
   const m = useMemo(
     () => ({
       brass: new MeshStandardMaterial({ color: C.gold, metalness: 1, roughness: 0.26 }),
+      // the footring is scuffed where shoes rest: a touch rougher than the post
+      brassWorn: new MeshStandardMaterial({ color: "#c99a3f", metalness: 1, roughness: 0.34 }),
       velvet: new MeshPhysicalMaterial({
         color: "#3a0d2a",
         roughness: 0.78,
@@ -21,6 +27,9 @@ export function Stool({ shadows }: { shadows: boolean }) {
   );
   const top = SEAT_HEIGHT;
   const cushion = 0.085;
+  const ringY = FOOTRING.y;
+  const ringR = FOOTRING.radius;
+  const spoke = ringR - 0.03;
   return (
     <group position={[ANCHORS.stool[0], 0, ANCHORS.stool[2]]}>
       <mesh position={[0, 0.012, 0]} material={m.brass} castShadow={shadows} receiveShadow={shadows}>
@@ -29,20 +38,26 @@ export function Stool({ shadows }: { shadows: boolean }) {
       <mesh position={[0, (top - cushion) / 2, 0]} material={m.brass} castShadow={shadows}>
         <cylinderGeometry args={[0.024, 0.03, top - cushion, 16]} />
       </mesh>
-      <mesh position={[0, 0.29, 0]} rotation-x={Math.PI / 2} material={m.brass} castShadow={shadows}>
-        <torusGeometry args={[0.16, 0.011, 8, 40]} />
+      {/* footring: a fat brass hoop on four spokes, a hub collar on the post */}
+      <mesh position={[0, ringY, 0]} rotation-x={Math.PI / 2} material={m.brassWorn} castShadow={shadows}>
+        <torusGeometry args={[ringR, FOOTRING.tube, 10, 56]} />
       </mesh>
-      {[0, 1, 2].map((i) => (
-        <mesh
-          key={i}
-          position={[Math.cos((i * Math.PI * 2) / 3) * 0.08, 0.29, Math.sin((i * Math.PI * 2) / 3) * 0.08]}
-          rotation-y={(-i * Math.PI * 2) / 3}
-          rotation-z={Math.PI / 2}
-          material={m.brass}
-        >
-          <cylinderGeometry args={[0.006, 0.006, 0.16, 6]} />
-        </mesh>
-      ))}
+      <mesh position={[0, ringY, 0]} material={m.brass}>
+        <cylinderGeometry args={[0.036, 0.036, 0.04, 20]} />
+      </mesh>
+      {[0, 1, 2, 3].map((i) => {
+        const a = Math.PI / 4 + (i * Math.PI) / 2;
+        return (
+          <mesh
+            key={i}
+            position={[Math.sin(a) * (0.03 + spoke / 2), ringY, Math.cos(a) * (0.03 + spoke / 2)]}
+            rotation={[Math.PI / 2, a, 0, "YXZ"]}
+            material={m.brass}
+          >
+            <cylinderGeometry args={[0.0065, 0.0065, spoke, 8]} />
+          </mesh>
+        );
+      })}
       {/* brass collar + velvet cushion with a softened crown */}
       <mesh position={[0, top - cushion - 0.006, 0]} material={m.brass} castShadow={shadows}>
         <cylinderGeometry args={[0.205, 0.19, 0.016, 40]} />

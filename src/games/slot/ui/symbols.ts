@@ -11,7 +11,8 @@ import { SYMBOL_IDS, SYMBOL_META, type SymbolId } from "../config";
 
 export const SYMBOL_BASE = "/games/slot/symbols/";
 
-export type SymbolArt = { src: string; label: string; alt: string; credit?: string };
+/** `fallback`: a second source to try when `src` fails (a live face falls back to its manifest tile) */
+export type SymbolArt = { src: string; label: string; alt: string; credit?: string; fallback?: string };
 export type SymbolArtMap = Record<SymbolId, SymbolArt>;
 
 type ManifestEntry = { src?: string; label?: string; alt?: string; credit?: string };
@@ -68,7 +69,10 @@ export function useSymbolArt(): { art: SymbolArtMap; ready: boolean } {
   const [state, setState] = useState<{ art: SymbolArtMap; ready: boolean }>(() => ({ art: defaultArt(), ready: false }));
   useEffect(() => {
     let alive = true;
-    fetch(`${SYMBOL_BASE}manifest.json`, { cache: "no-cache" })
+    // a manifest that never answers must not hold the reels: give up after 4 s and use the defaults
+    const ctl = new AbortController();
+    const giveUp = setTimeout(() => ctl.abort(), 4000);
+    fetch(`${SYMBOL_BASE}manifest.json`, { cache: "no-cache", signal: ctl.signal })
       .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
       .then((m) => {
         if (!alive) return;
@@ -83,9 +87,11 @@ export function useSymbolArt(): { art: SymbolArtMap; ready: boolean } {
         const show = () => alive && setState({ art, ready: true });
         void Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 2500))]).then(show);
       })
-      .catch(() => alive && setState((s) => ({ ...s, ready: true })));
+      .catch(() => alive && setState((s) => ({ ...s, ready: true })))
+      .finally(() => clearTimeout(giveUp));
     return () => {
       alive = false;
+      clearTimeout(giveUp);
     };
   }, []);
   return state;

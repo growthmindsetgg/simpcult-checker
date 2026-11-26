@@ -13,7 +13,7 @@ import gsap from "gsap";
 import { CatmullRomCurve3, Euler, Quaternion, Vector3 } from "three";
 import { ANCHORS, type CharacterState, type Vec3 } from "../contract";
 import { FACE, type ArmRig, type KeoneRig, type LegRig } from "./build";
-import { D, LEVER_DOWN, LEVER_PULLED, LEVER_RADIUS, LEVER_REST, PULL_TIMING, SEAT_HIPS_Y, STAND_HIPS_Y } from "./dims";
+import { D, FOOT_SEATED, LEVER_DOWN, LEVER_PULLED, LEVER_RADIUS, LEVER_REST, PULL_TIMING, SEAT_HIPS_Y, STAND_HIPS_Y } from "./dims";
 import { solveTwoBone } from "./ik";
 
 export type ReactKind = "loss" | "small" | "nice" | "big" | "mega";
@@ -77,6 +77,7 @@ function makeParams() {
     browSad: 0,
     happyEyes: 0,
     mouthPop: 1,
+    face: 0, // 0..1: turn toward the camera (stool swivel when seated, then chest, neck, head)
   };
 }
 export type KeoneParams = ReturnType<typeof makeParams>;
@@ -92,6 +93,8 @@ export class KeoneController {
   private targetYaw = this.yaw;
   private yawRate = 8;
   private mouth: Mouth = "smile";
+  /** the camera's world position, fed every frame by Keone.tsx: what "face the camera" turns toward */
+  readonly camPos = new Vector3(0, 1.6, 6);
 
   // locomotion
   private walking: Walk | null = null;
@@ -113,7 +116,7 @@ export class KeoneController {
   private lookPitchT = 0;
 
   // timelines and their pending promises
-  private tl: { move?: gsap.core.Timeline; pull?: gsap.core.Timeline; react?: gsap.core.Timeline } = {};
+  private tl: { move?: gsap.core.Timeline; pull?: gsap.core.Timeline; react?: gsap.core.Timeline; glance?: gsap.core.Timeline } = {};
   private pending: { walk?: () => void; move?: () => void; pull?: () => void } = {};
   /** bumped by every walk/sit/snap so an interrupted async sequence stops instead of continuing */
   private gen = 0;
@@ -146,7 +149,10 @@ export class KeoneController {
     this.cancelPull();
     this.tl.react?.kill();
     this.tl.react = undefined;
+    this.tl.glance?.kill();
+    this.tl.glance = undefined;
     this.resetOverlays();
+    this.p.face = 0;
   }
 
   // ── public actions ────────────────────────────────────────────────────────
@@ -194,6 +200,10 @@ export class KeoneController {
       // The cabinet swings its own arm from t=0 (smoothstep over LEVER_DOWN), so the hand
       // flies in, catches the ball on its way down, rides it to the bottom, then lets go.
       const smooth = (x: number) => x * x * (3 - 2 * x);
+      // the IK assumes he faces the machine: turn back from any glance first
+      this.tl.glance?.kill();
+      this.tl.glance = undefined;
+      tl.to(p, { face: 0, duration: 0.12, ease: "power2.out" }, 0);
       tl.call(() => this.setMouth("o"), [], 0.04);
       tl.to(p, { reach: 1, scoot: 0.1, duration: 0.2, ease: "power2.out" }, 0);
       tl.to(p, { ik: 1, duration: T.grip, ease: "power2.out" }, 0);
@@ -213,6 +223,11 @@ export class KeoneController {
     this.tl.react?.kill();
     this.resetReactOverlays();
     const p = this.p;
+    if (kind === "nice" || kind === "big" || kind === "mega") {
+      // turn to the camera with the grin, hold it, swing back (tweened from wherever he is)
+      const hold = kind === "nice" ? 1.0 : kind === "big" ? 1.35 : 1.75;
+      this.faceCamera(0.38, hold, 0.55);
+    }
     const tl = gsap.timeline({
       onComplete: () => {
         this.tl.react = undefined;
@@ -259,6 +274,32 @@ export class KeoneController {
         tl.to(p, { armsUp: 0, fist: 0, happyEyes: 0, browUp: 0, mouthPop: 1, duration: 0.5, ease: "power2.inOut" }, 1.55);
         break;
     }
+  }
+
+  /**
+   * A look to camera: seated he swivels the stool and turns his shoulders,
+   * standing or walking only the upper body turns. A cheeky brow and a grin.
+   */
+  glance(hold = 0.9) {
+    if (this.tl.pull) return;
+    this.faceCamera(0.42, hold, 0.5);
+    const p = this.p;
+    this.tl.react?.kill();
+    const tl = gsap.timeline({ onComplete: () => (this.tl.react = undefined) });
+    tl.call(() => this.setMouth("grin"), [], 0.12);
+    tl.to(p, { browUp: 0.55, duration: 0.18, ease: "power2.out" }, 0.1);
+    tl.fromTo(p, { mouthPop: 0.85 }, { mouthPop: 1, duration: 0.3, ease: "back.out(3)" }, 0.12);
+    tl.to(p, { browUp: 0, duration: 0.3, ease: "power2.inOut" }, 0.32 + hold);
+    tl.call(() => this.setMouth("smile"), [], 0.52 + hold);
+    this.tl.react = tl;
+  }
+
+  private faceCamera(turnIn: number, hold: number, turnOut: number) {
+    this.tl.glance?.kill();
+    const tl = gsap.timeline({ onComplete: () => (this.tl.glance = undefined) });
+    tl.to(this.p, { face: 1, duration: turnIn, ease: "power2.out" }, 0);
+    tl.to(this.p, { face: 0, duration: turnOut, ease: "power2.inOut" }, turnIn + hold);
+    this.tl.glance = tl;
   }
 
   snap(state: CharacterState) {
@@ -415,7 +456,8 @@ export class KeoneController {
   update(rawDt: number) {
     const rig = this.rig;
     if (!rig) return;
-    const dt = Math.min(rawDt, 1 / 20) * this.timeScale;
+    // same cap as the director's frame clock, so a slow device can't desync the walk from the camera
+    const dt = Math.min(rawDt, 1 / 10) * this.timeScale;
     this.t += dt;
     const t = this.t;
     const p = this.p;
@@ -425,10 +467,23 @@ export class KeoneController {
     // root
     const dy = wrapAngle(this.targetYaw - this.yaw);
     this.yaw = wrapAngle(this.yaw + dy * (1 - Math.exp(-this.yawRate * dt)));
-    rig.root.position.copy(this.pos);
-    rig.root.rotation.set(0, this.yaw, 0);
-
     const seat = clamp01(p.seat);
+
+    // face the camera: seated, the stool swivels for most of it; the rest goes to chest, neck and head
+    let turn = 0;
+    let lookUp = 0;
+    if (p.face > 0.001) {
+      const dx = this.camPos.x - this.pos.x;
+      const dz = this.camPos.z - this.pos.z;
+      turn = wrapAngle(Math.atan2(dx, dz) - this.yaw) * p.face;
+      lookUp = Math.atan2(this.camPos.y - 1.45, Math.hypot(dx, dz)) * p.face;
+    }
+    const swivel = seat * Math.max(-1.45, Math.min(1.45, turn * 0.62));
+    const upperMax = lerp(1.25, 1.0, seat);
+    const upper = Math.max(-upperMax, Math.min(upperMax, turn - swivel));
+    rig.root.position.copy(this.pos);
+    rig.root.rotation.set(0, this.yaw + swivel, 0);
+
     const W = this.walkW * (1 - seat);
     const ph = this.phase * TAU;
     const vN = Math.min(1.4, this.speed / 1.2);
@@ -441,7 +496,10 @@ export class KeoneController {
     const hipsY = lerp(standY, SEAT_HIPS_Y, seat) + p.hop + jumpY - p.yank * 0.03 * seat;
     const weight = Math.sin(t * 0.55) * (1 - W) * (1 - seat);
     // reaching for the lever he slides toward his right (-X) and forward on the seat
-    const hipsX = 0.022 * Math.sin(ph) * W + 0.012 * weight - 0.1 * p.reach * seat;
+    // seated at rest he lounges a little to his left (world −X): the big head clears the reels for the
+    // over-the-shoulder camera; any reach, turn or cheer straightens him up
+    const lounge = seat * (1 - p.reach) * (1 - p.face) * (1 - p.armsUp) * (1 - p.jump) * (1 - p.pump);
+    const hipsX = 0.022 * Math.sin(ph) * W + 0.012 * weight - 0.1 * p.reach * seat + 0.05 * lounge;
     const hipsZ = seat * (-0.03 + p.scoot);
     rig.hips.position.set(hipsX, hipsY, hipsZ);
     rig.hips.rotation.set(
@@ -454,15 +512,17 @@ export class KeoneController {
     // the lever sits beside the cabinet, so the reach is mostly a lean to his right
     // (keeps the big head clear of the cabinet face) with a little forward pitch
     const reach = p.reach * seat;
+    // seated, the sulk is mostly a drop of the head, not a lean into the reels (keeps reel 1 clear)
+    const slump = p.slump * (1 - 0.55 * seat);
     rig.spine.rotation.set(
-      0.07 * W * vN + 0.08 * seat + 0.16 * reach + 0.22 * p.slump + 0.1 * p.yank * seat - 0.08 * p.armsUp,
-      0.08 * Math.cos(ph) * W * vN + 0.12 * reach,
-      0.03 * Math.sin(ph) * W + 0.32 * reach + 0.02 * weight,
+      0.07 * W * vN + 0.08 * seat + 0.16 * reach + 0.22 * slump + 0.1 * p.yank * seat - 0.08 * p.armsUp,
+      0.08 * Math.cos(ph) * W * vN + 0.12 * reach + 0.18 * upper,
+      0.03 * Math.sin(ph) * W + 0.32 * reach + 0.02 * weight - 0.13 * lounge,
     );
     rig.chest.rotation.set(
-      0.02 * breath + 0.14 * reach + 0.14 * p.slump + 0.08 * p.yank * seat - 0.1 * p.armsUp,
-      0.06 * Math.cos(ph) * W * vN + 0.12 * reach,
-      0.22 * reach,
+      0.02 * breath + 0.14 * reach + 0.14 * slump + 0.08 * p.yank * seat - 0.1 * p.armsUp,
+      0.06 * Math.cos(ph) * W * vN + 0.12 * reach + 0.24 * upper,
+      0.22 * reach - 0.07 * lounge,
     );
     const bs = 1 + 0.012 * breath;
     rig.chest.scale.set(bs, 1, bs);
@@ -471,11 +531,16 @@ export class KeoneController {
     this.updateLook(dt, seat, W);
     const shake = p.shake * 0.32 * Math.sin(t * 15);
     const nod = p.nodAmp * 0.22 * Math.sin(p.nod * TAU * 2);
-    rig.neck.rotation.set(-0.12 * reach - 0.1 * seat * (1 - reach) + 0.12 * p.slump, 0.5 * this.lookYaw * (1 - reach), -0.22 * reach);
+    const idle = (1 - reach) * (1 - p.face);
+    rig.neck.rotation.set(
+      -0.12 * reach - 0.1 * seat * (1 - reach) * (1 - p.face) + 0.12 * p.slump - 0.35 * lookUp,
+      0.5 * this.lookYaw * idle + 0.26 * upper,
+      -0.22 * reach + 0.06 * lounge,
+    );
     rig.head.rotation.set(
-      this.lookPitch - 0.1 * reach + nod + 0.22 * p.slump - 0.25 * p.armsUp - 0.02 * bob * 10,
-      0.5 * this.lookYaw * (1 - reach) + shake - 0.3 * reach,
-      -0.05 * Math.sin(ph) * W - 0.2 * reach + 0.04 * weight,
+      this.lookPitch * (1 - p.face) - 0.1 * reach + nod + 0.22 * p.slump - 0.25 * p.armsUp * (1 - 0.6 * p.face) - 0.02 * bob * 10 - 0.45 * lookUp,
+      0.5 * this.lookYaw * idle + shake - 0.3 * reach + 0.32 * upper,
+      -0.05 * Math.sin(ph) * W - 0.2 * reach + 0.04 * weight + 0.1 * lounge,
     );
 
     // ── arms (FK), then right-arm lever IK ──
@@ -624,12 +689,12 @@ export class KeoneController {
     const sy = D.ankleH + lift + 0.04 * settle;
     const sz = this.strideZ * off;
 
-    // seated target, relative to the hips: thigh level, shin hanging, feet dangling and kicking idly
-    const kick = 0.035 * Math.sin(this.t * 1.9 + side * 1.4) * (1 - p.reach) * (1 - p.jump);
-    const tuck = p.jump * 0.06;
-    const ax = hips.x + side * (D.hipX + 0.01);
-    const ay = hips.y - D.hipDrop - D.shin * 0.96 + tuck;
-    const az = hips.z + D.thigh - 0.05 + kick - tuck;
+    // seated target: soles on the stool's footring, pinned in root space (the lever scoot and the
+    // bounce flex the knees instead of sliding the feet); a slow idle heel tap, tucked up on a jump
+    const kick = 0.008 * Math.sin(this.t * 1.9 + side * 1.4) * (1 - p.reach) * (1 - p.jump);
+    const ax = hips.x * 0.5 + side * (D.hipX + 0.01);
+    const ay = FOOT_SEATED.ankleY + p.jump * 0.13 + Math.max(0, kick) * 1.5;
+    const az = FOOT_SEATED.ankleZ + kick - p.jump * 0.05;
 
     // blend; during the hop the feet leave the floor early
     const k = seat * seat * (3 - 2 * seat);
@@ -645,7 +710,7 @@ export class KeoneController {
     leg.thigh.updateMatrixWorld(true);
 
     // keep the sole flat (or pitched) in root space: foot = inv(shinWorld) * rootWorld * desired
-    const footPitch = lerp(pitch, 0.4, k) + 0.08 * Math.sin(this.t * 1.9 + side * 1.4) * k;
+    const footPitch = lerp(pitch, 0.22, k) + 0.04 * Math.sin(this.t * 1.9 + side * 1.4) * k;
     this.eu.set(footPitch, side * 0.07 * (1 - W), 0);
     this.qC.setFromEuler(this.eu);
     leg.shin.getWorldQuaternion(this.qD).invert();

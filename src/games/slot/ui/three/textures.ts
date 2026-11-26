@@ -8,11 +8,15 @@
 
 const DISPLAY = '"Bodoni Moda Variable", "Bodoni 72", Didot, Georgia, serif';
 
+/** resolves once Bodoni is usable, or after 2.5 s with a system serif standing in; never rejects */
 export async function fontsReady() {
   try {
-    await Promise.all([
-      document.fonts.load(`italic 600 120px "Bodoni Moda Variable"`),
-      document.fonts.load(`600 60px "Bodoni Moda Variable"`),
+    await Promise.race([
+      Promise.all([
+        document.fonts.load(`italic 600 120px "Bodoni Moda Variable"`),
+        document.fonts.load(`600 60px "Bodoni Moda Variable"`),
+      ]),
+      new Promise((r) => setTimeout(r, 2500)),
     ]);
   } catch {
     /* fall back to a system serif */
@@ -155,4 +159,52 @@ function spaced(g: CanvasRenderingContext2D, text: string, x: number, y: number,
     cx += widths[i];
   });
   g.textAlign = "center";
+}
+
+/**
+ * Brass roughness (green channel, a multiplier on material.roughness): a
+ * mid-grey ground, fine horizontal polishing streaks in two weights, and a few
+ * soft smudges where hands rest. Uniform roughness is what makes metal look
+ * rendered; this breaks every highlight up a little.
+ */
+export function drawBrassRoughness(c: HTMLCanvasElement) {
+  const S = 256;
+  c.width = S;
+  c.height = S;
+  const g = c.getContext("2d");
+  if (!g) return;
+  // deterministic noise, so every load looks the same
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = "rgb(150,150,150)";
+  g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 420; i++) {
+    const y = rnd() * S;
+    const light = rnd() > 0.5;
+    g.strokeStyle = light ? `rgba(190,190,190,${0.06 + rnd() * 0.12})` : `rgba(110,110,110,${0.05 + rnd() * 0.11})`;
+    g.lineWidth = rnd() > 0.85 ? 1.6 : 0.6;
+    const x = rnd() * S;
+    const len = 30 + rnd() * 160;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + len, y + (rnd() - 0.5) * 1.2);
+    g.stroke();
+    if (x + len > S) {
+      // wrap so the tile repeats without a seam
+      g.beginPath();
+      g.moveTo(x - S, y);
+      g.lineTo(x + len - S, y);
+      g.stroke();
+    }
+  }
+  for (let i = 0; i < 7; i++) {
+    const x = rnd() * S;
+    const y = rnd() * S;
+    const r = 18 + rnd() * 40;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, `rgba(205,205,205,${0.16 + rnd() * 0.14})`);
+    rg.addColorStop(1, "rgba(215,215,215,0)");
+    g.fillStyle = rg;
+    g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
 }

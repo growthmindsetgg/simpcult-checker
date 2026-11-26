@@ -13,4 +13,4 @@ export const C = {
 } as const;
 
 /** Fog density (exp2). Tuned so the far end of the aisle (≈12 m) is mostly haze. */
-export const FOG_DENSITY = 0.062;
+export const FOG_DENSITY = 0.055;

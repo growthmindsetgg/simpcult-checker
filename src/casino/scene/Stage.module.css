@@ -33,38 +33,62 @@
   opacity: 0;
 }
 
+/*
+ * skip intro: a quiet brass text button, bottom-right. Portalled to <body> and
+ * fixed, so the page copy (home) and the HUD (slot) can't sit on top of it.
+ * On the slot page it rides above the HUD; on a phone's home page, above the copy.
+ */
 .skip {
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
-  z-index: 2;
-  padding: 9px 16px 10px;
-  border: 1px solid rgba(217, 168, 69, 0.55);
-  border-radius: 2px;
-  background: rgba(10, 6, 16, 0.55);
-  color: #f6dc95;
-  font: 500 12px/1 var(--font-inter, Inter, system-ui, sans-serif);
-  letter-spacing: 0.14em;
-  text-transform: lowercase;
+  position: fixed;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px));
+  z-index: 60;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px 4px;
+  border: 0;
+  background: none;
+  color: #d9a845;
+  font: italic 500 15px/1 var(--display, "Bodoni Moda", Georgia, serif);
+  letter-spacing: 0.01em;
+  text-decoration: underline;
+  text-decoration-color: rgba(217, 168, 69, 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 5px;
+  text-shadow: 0 1px 10px rgba(10, 6, 16, 0.9);
   cursor: pointer;
   opacity: 0;
-  animation: skipIn 320ms cubic-bezier(0.23, 1, 0.32, 1) 700ms forwards;
+  animation: skipIn 320ms cubic-bezier(0.23, 1, 0.32, 1) 900ms forwards;
   transition:
-    border-color 160ms cubic-bezier(0.23, 1, 0.32, 1),
     color 160ms cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
+    text-decoration-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
   -webkit-tap-highlight-color: transparent;
 }
+/* the slot page: just above the HUD's right-hand buttons */
+.skip[data-mode="play"] {
+  bottom: 132px;
+}
+@media (max-width: 899px) {
+  /* phones: the HUD fills the bottom ~30%; the home copy the bottom ~40% */
+  .skip[data-mode="play"] {
+    bottom: max(31svh, 250px);
+  }
+  .skip[data-mode="hero"] {
+    bottom: max(41svh, 330px);
+  }
+}
 .skip kbd {
-  margin-left: 10px;
-  font: inherit;
-  font-size: 10px;
-  color: rgba(246, 220, 149, 0.55);
+  font: 500 10px/1 var(--font-mono, "JetBrains Mono", ui-monospace, monospace);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: rgba(217, 168, 69, 0.55);
 }
 @media (hover: hover) {
   .skip:hover {
-    border-color: #d9a845;
-    background: rgba(42, 11, 31, 0.75);
+    color: #f6dc95;
+    text-decoration-color: rgba(246, 220, 149, 0.8);
   }
 }
 .skip:focus-visible {

@@ -59,7 +59,8 @@ function makeMaterials() {
     metalness: 0.2,
   });
   const amber = new MeshStandardMaterial({ color: "#1a0e05", emissive: new Color("#ff9a4a"), emissiveIntensity: 0.55 });
-  const beyond = new MeshStandardMaterial({ color: "#000", emissive: new Color("#c9763e"), emissiveIntensity: 0.55 });
+  // the doorway glow: dim enough to read as a warm corridor beyond, not a lit panel
+  const beyond = new MeshStandardMaterial({ color: "#000", emissive: new Color("#9a4a2c"), emissiveIntensity: 0.12 });
   return { velvet, brass, brassDim, lacquer, ceiling, glassWarm, screenDim, beyond, amber };
 }
 
@@ -500,5 +501,7 @@ export const LAMPS = {
   banquette: [-2.7, 1.15, ROOM.z0 + 1.3] as const,
   bar: [3.95, 2.1, ROOM.z0 + 0.6] as const,
   sconce: [ROOM.x1 - 0.35, 2.1, 7.0] as const,
+  /** the left-wall sconce nearest the machine: grazes the tufted wall and the aisle as he walks in */
+  sconceL: [ROOM.x0 + 0.35, 2.1, 4.5] as const,
 };
 

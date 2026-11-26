@@ -14,7 +14,7 @@ import "@fontsource-variable/bodoni-moda";
 import "@fontsource-variable/bodoni-moda/wght-italic.css";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import * as THREE from "three";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { RoundedBox } from "@react-three/drei";
 import { ANCHORS, CABINET_SIZE, type CabinetHandle, type Quality } from "@/casino/contract";
 import { PAYLINES, type SymbolId } from "../../config";
@@ -23,7 +23,9 @@ import { applyFaces, useFaces } from "../faces";
 import { sfx } from "../sound";
 import { ANTICIPATION_MS, ATTRACT_GRID } from "../useSlotGame";
 import { createAtlas, paintAtlas } from "./atlas";
-import { drawBelly, drawSign, fontsReady } from "./textures";
+import { drawBelly, drawBrassRoughness, drawSign, fontsReady } from "./textures";
+import { buildCabinetEnv, capDirectSpecular, glassShadeMaterial, glassSheenMaterial } from "./materials";
+import { resetCabinet, tickCabinet } from "./live";
 import { ALPHA, RADIUS, REEL_GAP, REEL_W, REEL_X, ReelSystem } from "./reels";
 
 type Tier = "small" | "nice" | "big" | "mega";
@@ -46,6 +48,23 @@ const BRACKET_BACK = 0.08; // the lever bracket starts here on the cabinet's sid
 const LEVER_REST = 0.18; // rad, a slight forward lean
 const LEVER_PULLED = 2.6; // rad: ball travels ~0.34 m down
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** linear F0 reflectance for a conductor's `color` (no sRGB round trip) */
+const F0 = (r: number, g: number, b: number) => new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+
+/**
+ * Win juice per tier (game-feel). Small: the reel ticks and a quiet glow, no
+ * hold. Medium (nice): a 50 ms hold, a few coins. Large (big/mega): a
+ * 120-150 ms hold, one flash, and a zoom punch (the page scales the stage).
+ * The hold freezes the drums' clock only; the stop() promise never waits on it.
+ */
+const JUICE: Record<Tier, { hold: number; trauma: number; coins: number; flash: number }> = {
+  small: { hold: 0, trauma: 0, coins: 0, flash: 0 },
+  nice: { hold: 0.05, trauma: 0.32, coins: 9, flash: 0 },
+  big: { hold: 0.12, trauma: 0.72, coins: 30, flash: 0.5 },
+  mega: { hold: 0.15, trauma: 1, coins: 48, flash: 0.65 },
+};
+/** the winning line leads; coins follow once it has mostly drawn */
+const COINS_AFTER_LINE = 0.28;
 
 const COLORS = {
   lacquer: "#3d0b26",
@@ -91,6 +110,7 @@ function frameShape(ow: number, oh: number, or: number, iw: number, ih: number, 
   return s;
 }
 
+const N_TOP_BULBS = 26;
 const TOPPER_BASE = 1.73;
 const TOPPER_RECT = 0.13;
 const TOPPER_RY = 0.175;
@@ -110,7 +130,7 @@ type CoinSim = {
   r: Float32Array;
   w: Float32Array;
   life: Float32Array;
-  pending: { at: number; n: number }[];
+  pending: { at: number; n: number; tier?: Tier; soft?: boolean }[];
   next: number;
 };
 const newCoinSim = (n: number): CoinSim => ({
@@ -135,34 +155,60 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
   const faces = useFaces();
   const art = useMemo(() => applyFaces(baseArt, faces), [baseArt, faces]);
 
+  const gl = useThree((s) => s.gl);
   const [gfx] = useState(() => {
     const atlas = createAtlas();
-    const tex = (c: HTMLCanvasElement) => {
+    const aniso = Math.min(8, gl.capabilities.getMaxAnisotropy());
+    const tex = (c: HTMLCanvasElement, premultiplied = false) => {
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
+      t.anisotropy = aniso;
       t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.generateMipmaps = true;
+      t.premultiplyAlpha = premultiplied;
       return t;
     };
-    const map = tex(atlas.sharp);
-    const blur = tex(atlas.blur);
+    const map = tex(atlas.sharp, true);
+    const blur = tex(atlas.blur, true);
     const signCanvas = document.createElement("canvas");
     const bellyCanvas = document.createElement("canvas");
+    const roughCanvas = document.createElement("canvas");
     drawSign(signCanvas);
     drawBelly(bellyCanvas);
+    drawBrassRoughness(roughCanvas);
     const sign = tex(signCanvas);
     const belly = tex(bellyCanvas);
+    const rough = new THREE.CanvasTexture(roughCanvas);
+    rough.colorSpace = THREE.NoColorSpace;
+    rough.wrapS = rough.wrapT = THREE.RepeatWrapping;
+    // extrude UVs are in metres and primitives' are 0..1 per face: ~14 tiles keeps the streaks millimetre-fine on both
+    rough.repeat.set(14, 14);
+    rough.anisotropy = aniso;
+    const env = buildCabinetEnv(gl);
     const reels = new ReelSystem(map, blur);
     reels.show(ATTRACT_GRID);
-    return { atlas, map, blur, sign, signCanvas, belly, bellyCanvas, reels };
+    return { atlas, map, blur, sign, signCanvas, belly, bellyCanvas, rough, env, reels };
   });
   const { reels } = gfx;
+  /** how many atlas cells fell back to the drawn name tile on the last paint (-1: not painted yet) */
+  const fallbackCount = useRef(-1);
 
   useEffect(() => {
     if (!ready) return;
     let alive = true;
-    void paintAtlas(gfx.atlas, art).then(() => {
+    // paintAtlas always resolves with every cell painted (art, its fallback source, or the name tile)
+    const upload = () => {
       if (!alive) return;
+      gfx.map.needsUpdate = true;
+      gfx.blur.needsUpdate = true;
+    };
+    void paintAtlas(gfx.atlas, art, () => {
+      // art that arrived after its timeout replaced its name tile
+      fallbackCount.current = Math.max(0, fallbackCount.current - 1);
+      upload();
+    }).then((fallbacks) => {
+      if (!alive) return;
+      fallbackCount.current = fallbacks;
       gfx.map.needsUpdate = true;
       gfx.blur.needsUpdate = true;
     });
@@ -192,9 +238,28 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       gfx.blur.dispose();
       gfx.sign.dispose();
       gfx.belly.dispose();
+      gfx.rough.dispose();
+      gfx.env.dispose();
+      resetCabinet();
     },
     [gfx, reels],
   );
+
+  // dev-only readback for the play tests: what the drums show, and the meshes worth toggling
+  const glassRef = useRef<THREE.Group>(null);
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const w = window as unknown as { __simpCabinet?: unknown };
+    w.__simpCabinet = {
+      grid: () => reels.visibleGrid(),
+      busy: () => reels.busy,
+      glass: () => glassRef.current,
+      fallbacks: () => fallbackCount.current,
+    };
+    return () => {
+      delete w.__simpCabinet;
+    };
+  }, [reels]);
 
   const reduced = useRef(false);
   useEffect(() => {
@@ -202,32 +267,73 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
   }, [reducedMotion]);
 
   // ── materials ─────────────────────────────────────────────────────────────
+  // conductors: metalness 1, measured F0 in `color`, the cabinet's own card studio bound as envMap
   const mats = useMemo(() => {
-    const lacquer = new THREE.MeshPhysicalMaterial({
-      color: COLORS.lacquer,
-      roughness: 0.4,
-      clearcoat: 1,
-      clearcoatRoughness: 0.09,
-    });
-    const lacquerDeep = new THREE.MeshPhysicalMaterial({
-      color: COLORS.lacquerDeep,
-      roughness: 0.5,
-      clearcoat: 0.8,
-      clearcoatRoughness: 0.15,
-    });
-    const brass = new THREE.MeshStandardMaterial({ color: COLORS.gold, metalness: 1, roughness: 0.3 });
-    const brassSoft = new THREE.MeshStandardMaterial({ color: "#b8873a", metalness: 1, roughness: 0.42 });
+    const env = gfx.env;
+    const lacquer = capDirectSpecular(
+      new THREE.MeshPhysicalMaterial({
+        color: COLORS.lacquer,
+        roughness: 0.42,
+        clearcoat: 1,
+        clearcoatRoughness: 0.07,
+        envMap: env,
+        envMapIntensity: 0.7,
+      }),
+    );
+    const lacquerDeep = capDirectSpecular(
+      new THREE.MeshPhysicalMaterial({
+        color: COLORS.lacquerDeep,
+        roughness: 0.5,
+        clearcoat: 0.85,
+        clearcoatRoughness: 0.12,
+        envMap: env,
+        envMapIntensity: 0.55,
+      }),
+    );
+    // brass: F0 0.89/0.72/0.36 nudged toward the palette's gold; roughness 0.25-0.42 through the streak map
+    const brass = capDirectSpecular(
+      new THREE.MeshStandardMaterial({
+        color: F0(0.89, 0.68, 0.3),
+        metalness: 1,
+        roughness: 0.5,
+        roughnessMap: gfx.rough,
+        envMap: env,
+        envMapIntensity: 0.95,
+      }),
+    );
+    // brass in the tray and the lever boss: older, darker, rougher
+    const brassSoft = capDirectSpecular(
+      new THREE.MeshStandardMaterial({
+        color: F0(0.66, 0.48, 0.21),
+        metalness: 1,
+        roughness: 0.78,
+        roughnessMap: gfx.rough,
+        envMap: env,
+        envMapIntensity: 0.8,
+      }),
+    );
     const dark = new THREE.MeshStandardMaterial({ color: "#0b0308", roughness: 0.95 });
+    // the belly glass keeps a lit pane (it sits under printed art, not over the reels)
     const glass = new THREE.MeshPhysicalMaterial({
       color: "#ffffff",
       transparent: true,
-      opacity: 0.1,
-      roughness: 0.04,
+      opacity: 0.08,
+      roughness: 0.18,
       metalness: 0,
-      clearcoat: 1,
+      envMap: env,
+      envMapIntensity: 0.4,
       depthWrite: false,
     });
-    const ball = new THREE.MeshPhysicalMaterial({ color: "#a50f45", roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 });
+    const reelGlassShade = glassShadeMaterial(WIN_W / WIN_H);
+    const reelGlassSheen = glassSheenMaterial();
+    const ball = new THREE.MeshPhysicalMaterial({
+      color: "#a50f45",
+      roughness: 0.18,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      envMap: env,
+      envMapIntensity: 0.8,
+    });
     const cream = new THREE.MeshStandardMaterial({ color: "#f1e4cc", roughness: 0.45 });
     const belly = new THREE.MeshStandardMaterial({
       map: gfx.belly,
@@ -245,18 +351,22 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       toneMapped: false,
     });
     const line = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ff6cc4").multiplyScalar(4),
+      color: new THREE.Color("#ff6cc4").multiplyScalar(3.4),
       toneMapped: false,
       transparent: true,
     });
-    const coin = new THREE.MeshStandardMaterial({
-      color: "#e8bb55",
-      metalness: 0.85,
-      roughness: 0.28,
-      emissive: new THREE.Color("#7a5418"),
-      emissiveIntensity: 0.55,
-    });
-    return { lacquer, lacquerDeep, brass, brassSoft, dark, glass, ball, cream, belly, sign, line, coin };
+    // coins: gold F0, polished
+    const coin = capDirectSpecular(
+      new THREE.MeshStandardMaterial({
+        color: F0(1.0, 0.71, 0.29),
+        metalness: 1,
+        roughness: 0.26,
+        envMap: env,
+        envMapIntensity: 1.15,
+      }),
+      1.0,
+    );
+    return { lacquer, lacquerDeep, brass, brassSoft, dark, glass, reelGlassShade, reelGlassSheen, ball, cream, belly, sign, line, coin };
   }, [gfx]);
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
 
@@ -310,9 +420,8 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
     // along the topper arch
     const arch = archPoints(0.47, TOPPER_RECT - 0.002, TOPPER_RY + 0.0, 200);
     const curve = new THREE.CatmullRomCurve3(arch.map((p) => new THREE.Vector3(p.x, p.y, 0)));
-    const nTop = 26;
-    for (let i = 0; i < nTop; i++) {
-      const p = curve.getPointAt(0.04 + (i / (nTop - 1)) * 0.92);
+    for (let i = 0; i < N_TOP_BULBS; i++) {
+      const p = curve.getPointAt(0.04 + (i / (N_TOP_BULBS - 1)) * 0.92);
       pos.push(new THREE.Vector3(p.x, TOPPER_BASE + p.y, 0.18 + 0.014));
     }
     // around the reel bezel
@@ -356,7 +465,12 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
   const fx = useRef({
     mode: "idle" as "idle" | "spin" | Tier,
     modeAt: 0,
-    shakeUntil: 0,
+    /** hit-stop: the drums' clock is held until this wall-clock second */
+    holdUntil: 0,
+    /** screen-shake energy 0..1, decays in real time; the visible offset is trauma² */
+    trauma: 0,
+    shakeT: 0,
+    flash: 0,
     lineOn: [] as number[],
     lineAt: 0,
     lever: { from: LEVER_REST, to: LEVER_REST, t0: 0, dur: 0, spring: false },
@@ -368,6 +482,7 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
   const lineMeshes = useRef<(THREE.Mesh | null)[]>([]);
 
   const scratch = useRef<{ color: THREE.Color; obj: THREE.Object3D } | null>(null);
+  const sheenMesh = useRef<THREE.Mesh>(null);
   const signMesh = useRef<THREE.Mesh>(null);
 
   useFrame((_, delta) => {
@@ -376,17 +491,22 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
     scratch.current ??= { color: new THREE.Color(), obj: new THREE.Object3D() };
     const { color, obj } = scratch.current;
     const f = fx.current;
-    reels.update(dt);
+    tickCabinet(delta);
+    // hit-stop holds the drums (their settle, glow and wink) for a beat; everything else runs on
+    reels.update(now < f.holdUntil ? 0 : dt);
 
     // bulbs: a chase whose pace says what the machine is doing
     const m = bulbMesh.current;
     if (m) {
-      const pace = f.mode === "idle" ? 1.4 : f.mode === "spin" ? 9 : f.mode === "big" || f.mode === "mega" ? 22 : 13;
+      const pace = f.mode === "idle" ? 1.4 : f.mode === "spin" ? 9 : f.mode === "big" || f.mode === "mega" ? 16 : 11;
       const step = Math.floor(now * pace);
-      const winFlash = (f.mode === "big" || f.mode === "mega") && Math.floor(now * 6) % 2 === 0;
+      // big wins alternate halves twice a second (well under the 3 flashes/s limit)
+      const winFlash = (f.mode === "big" || f.mode === "mega") && Math.floor(now * 4) % 2 === 0;
       for (let i = 0; i < bulbs.length; i++) {
         const lit = winFlash ? i % 2 === 0 : (i + step) % 3 === 0;
-        const k = f.mode === "idle" ? (lit ? 1.15 : 0.22) : lit ? 2.6 : 0.16;
+        // the ring around the reel window stays dimmer than the arch, so its bloom never veils the symbols
+        const peak = i < N_TOP_BULBS ? 2.6 : 1.5;
+        const k = f.mode === "idle" ? (lit ? (i < N_TOP_BULBS ? 1.15 : 0.9) : 0.2) : lit ? peak : 0.16;
         color.setRGB(1.0 * k, 0.66 * k, 0.26 * k);
         m.setColorAt(i, color);
       }
@@ -410,10 +530,11 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       const order = f.lineOn.indexOf(i);
       mesh.visible = order >= 0;
       if (order < 0) return;
-      const t = Math.min(1, Math.max(0, (now - f.lineAt - order * 0.09) / 0.42));
+      // the first line leads; later ones follow on shrinking gaps so the set reads as one wave
+      const t = Math.min(1, Math.max(0, (now - f.lineAt - (order * 0.085 - order * order * 0.008)) / 0.42));
       const g = mesh.geometry as THREE.TubeGeometry;
       const total = g.index ? g.index.count : 0;
-      g.setDrawRange(0, Math.floor((1 - Math.pow(1 - t, 3)) * total / 6) * 6);
+      g.setDrawRange(0, Math.floor(((1 - Math.pow(1 - t, 3)) * total) / 6) * 6);
       (mesh.material as THREE.MeshBasicMaterial).opacity = 0.75 + 0.25 * Math.sin(now * 8 + i);
     });
 
@@ -433,30 +554,45 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       arm.rotation.x = a;
     }
 
-    // shake-lite: the cabinet shivers, the camera stays the director's
+    // shake: the cabinet shivers from decaying trauma on summed sines (never per-frame noise);
+    // the camera stays the director's
     const g = root.current;
     if (g) {
-      if (now < f.shakeUntil) {
-        const amp = 0.0045 * Math.min(1, (f.shakeUntil - now) / 0.4);
-        g.position.set((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp * 0.5, 0);
-      } else if (g.position.x !== 0) g.position.set(0, 0, 0);
+      if (f.trauma > 0) {
+        f.trauma = Math.max(0, f.trauma - 1.5 * dt);
+        f.shakeT += dt * 30;
+        const k = f.trauma * f.trauma;
+        g.position.set(0.006 * k * Math.sin(f.shakeT * 1.7), 0.003 * k * Math.sin(f.shakeT * 2.3), 0);
+        g.rotation.z = 0.0035 * k * Math.sin(f.shakeT * 1.1);
+      } else if (g.position.x !== 0 || g.rotation.z !== 0) {
+        g.position.set(0, 0, 0);
+        g.rotation.z = 0;
+      }
     }
+
+    // the one flash on a large win: a pink wash over the glass, gone in ~0.2 s
+    if (f.flash > 0) f.flash = Math.max(0, f.flash - dt * 3.2);
+    const sheen = sheenMesh.current?.material as THREE.ShaderMaterial | undefined;
+    if (sheen) sheen.uniforms.uFlash.value = f.flash * f.flash;
 
     // coins
     const cm = coinMesh.current;
     if (cm) {
       const s = coinSim();
       while (s.pending.length && s.pending[0].at <= now) {
-        const { n } = s.pending.shift()!;
+        const { n, tier, soft } = s.pending.shift()!;
+        if (tier === "big" || tier === "mega") sfx.coinShower(tier);
         for (let k = 0; k < n; k++) {
           const i = s.next++ % COINS;
           const j = i * 3;
           s.p[j] = (Math.random() - 0.5) * 0.4;
           s.p[j + 1] = REEL_Y + (Math.random() - 0.5) * 0.2;
           s.p[j + 2] = GLASS_Z + 0.02;
-          s.v[j] = (Math.random() - 0.5) * 2.2;
-          s.v[j + 1] = 1.2 + Math.random() * 2.2;
-          s.v[j + 2] = 0.9 + Math.random() * 1.6;
+          // soft: the few coins of a nice win hop out and drop into the tray
+          const pow = soft ? 0.45 : 1;
+          s.v[j] = (Math.random() - 0.5) * 2.2 * pow;
+          s.v[j + 1] = (1.2 + Math.random() * 2.2) * pow;
+          s.v[j + 2] = (0.9 + Math.random() * 1.6) * pow;
           s.r[j] = Math.random() * 6;
           s.r[j + 1] = Math.random() * 6;
           s.r[j + 2] = Math.random() * 6;
@@ -543,17 +679,26 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
           f.lineOn = [];
           return;
         }
+        // the win, choreographed: impact (hold + flash) → the winning line draws (the lead) →
+        // the page's counter runs (support) → coins (decoration)
+        const j = JUICE[tier];
+        const calm = reduced.current;
+        const hold = calm ? 0 : j.hold;
         const key = new Set(cells.map(([r, w]) => `${r}:${w}`));
         f.lineOn = PAYLINES.map((rows, i) => (rows.every((row, reel) => key.has(`${reel}:${row}`)) ? i : -1)).filter((i) => i >= 0);
-        f.lineAt = now;
+        f.holdUntil = now + hold;
+        f.lineAt = now + hold;
         f.mode = tier;
         f.modeAt = now;
-        if ((tier === "big" || tier === "mega") && !reduced.current) {
-          f.shakeUntil = now + (tier === "mega" ? 0.9 : 0.55);
+        // reduced motion: no hold, no shake, no coins; the flash becomes a faint tint
+        f.flash = calm ? j.flash * 0.35 : j.flash;
+        if (calm) return;
+        f.trauma = Math.min(1, f.trauma + j.trauma);
+        if (j.coins > 0) {
           const cs = coinSim();
-          cs.pending.push({ at: now + 0.05, n: tier === "mega" ? 48 : 30 });
-          if (tier === "mega") cs.pending.push({ at: now + 0.7, n: 40 });
-          sfx.coinShower(tier);
+          const at = now + hold + COINS_AFTER_LINE;
+          cs.pending.push({ at, n: j.coins, tier, soft: tier === "nice" });
+          if (tier === "mega") cs.pending.push({ at: at + 0.65, n: 40 });
         }
       },
       pullLever() {
@@ -561,9 +706,21 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
         const f = fx.current;
         const now = performance.now() / 1000;
         const down = 0.34;
-        f.lever = { from: leverArm.current?.rotation.x ?? LEVER_REST, to: LEVER_PULLED, t0: now, dur: down, spring: false };
+        f.lever = {
+          from: leverArm.current?.rotation.x ?? LEVER_REST,
+          to: LEVER_PULLED,
+          t0: now,
+          dur: down,
+          spring: false,
+        };
         return sleep(down * 1000).then(() => {
-          f.lever = { from: LEVER_PULLED, to: LEVER_REST, t0: performance.now() / 1000, dur: 0.9, spring: true };
+          f.lever = {
+            from: LEVER_PULLED,
+            to: LEVER_REST,
+            t0: performance.now() / 1000,
+            dur: 0.9,
+            spring: true,
+          };
         });
       },
     }),
@@ -586,9 +743,7 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
     <group ref={root} name="simp-cabinet">
       {/* plinth + brass kick plate */}
       <RoundedBox args={[W, 0.1, D]} radius={0.012} position={[0, 0.05, 0]} material={mats.lacquerDeep} {...cast} />
-      <mesh position={[0, 0.085, D / 2 + 0.002]} material={mats.brass}>
-        <boxGeometry args={[W - 0.02, 0.022, 0.006]} />
-      </mesh>
+      <RoundedBox args={[W - 0.02, 0.022, 0.006]} radius={0.0025} smoothness={3} position={[0, 0.085, D / 2 + 0.002]} material={mats.brass} />
 
       {/* lower body */}
       <RoundedBox args={[0.94, 0.86, 0.72]} radius={0.02} position={[0, 0.53, -0.04]} material={mats.lacquer} {...cast} />
@@ -605,16 +760,10 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       <mesh position={[0, 0.262, 0.322]} material={mats.dark}>
         <planeGeometry args={[0.4, 0.09]} />
       </mesh>
-      <mesh position={[0, 0.205, 0.358]} material={mats.brassSoft}>
-        <boxGeometry args={[0.44, 0.012, 0.075]} />
-      </mesh>
-      <mesh position={[0, 0.235, 0.394]} material={mats.brass}>
-        <boxGeometry args={[0.44, 0.072, 0.01]} />
-      </mesh>
+      <RoundedBox args={[0.44, 0.012, 0.075]} radius={0.004} smoothness={3} position={[0, 0.205, 0.358]} material={mats.brassSoft} />
+      <RoundedBox args={[0.44, 0.072, 0.01]} radius={0.004} smoothness={3} position={[0, 0.235, 0.394]} material={mats.brass} />
       {[-1, 1].map((sx) => (
-        <mesh key={sx} position={[sx * 0.215, 0.235, 0.358]} material={mats.brass}>
-          <boxGeometry args={[0.01, 0.072, 0.075]} />
-        </mesh>
+        <RoundedBox key={sx} args={[0.01, 0.072, 0.075]} radius={0.004} smoothness={3} position={[sx * 0.215, 0.235, 0.358]} material={mats.brass} />
       ))}
 
       {/* front corner trims */}
@@ -689,14 +838,18 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
 
       {/* brass bezel and glass */}
       <mesh geometry={geo.bezel} position={[0, REEL_Y, FRONT + 0.008]} material={mats.brass} {...cast} />
-      <mesh position={[0, REEL_Y, GLASS_Z]} material={mats.glass} renderOrder={3}>
-        <planeGeometry args={[WIN_W, WIN_H]} />
-      </mesh>
+      {/* reel glass: unlit, a dark inner-shadow layer and a faint additive reflection (and the win flash) */}
+      <group ref={glassRef}>
+        <mesh position={[0, REEL_Y, GLASS_Z - 0.001]} material={mats.reelGlassShade} renderOrder={3}>
+          <planeGeometry args={[WIN_W, WIN_H]} />
+        </mesh>
+        <mesh ref={sheenMesh} position={[0, REEL_Y, GLASS_Z]} material={mats.reelGlassSheen} renderOrder={4}>
+          <planeGeometry args={[WIN_W, WIN_H]} />
+        </mesh>
+      </group>
 
       {/* band + arched topper with the neon sign */}
-      <mesh position={[0, TOPPER_BASE - 0.012, -0.08]} material={mats.brass}>
-        <boxGeometry args={[0.97, 0.024, 0.62]} />
-      </mesh>
+      <RoundedBox args={[0.97, 0.024, 0.62]} radius={0.008} smoothness={3} position={[0, TOPPER_BASE - 0.012, -0.08]} material={mats.brass} />
       <mesh geometry={geo.topper} position={[0, TOPPER_BASE, -0.36]} material={mats.lacquer} {...cast} />
       <mesh geometry={geo.inner} position={[0, TOPPER_BASE, 0.193]} material={mats.dark} />
       <mesh geometry={geo.rim} position={[0, TOPPER_BASE, 0.194]} material={mats.brass} />
@@ -715,7 +868,7 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       <mesh position={[0.495, ly, (BRACKET_BACK + lz + 0.05) / 2]} material={mats.lacquerDeep}>
         <boxGeometry args={[0.05, 0.14, lz + 0.05 - BRACKET_BACK]} />
       </mesh>
-      <mesh position={[0.532, ly, lz]} rotation={[0, 0, Math.PI / 2]} material={mats.brass}>
+      <mesh position={[0.532, ly, lz]} rotation={[0, 0, Math.PI / 2]} material={mats.brassSoft}>
         <cylinderGeometry args={[0.056, 0.06, 0.026, 28]} />
       </mesh>
       <group ref={leverArm} position={[lx, ly, lz]} rotation={[LEVER_REST, 0, 0]}>

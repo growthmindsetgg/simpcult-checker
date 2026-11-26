@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Canvas } from "@react-three/fiber";
-import { Environment, Lightformer, OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { Bloom, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
-import { ToneMappingMode } from "postprocessing";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
+import { Lights } from "@/casino/scene/Lights";
+import { Post } from "@/casino/scene/Post";
+import { FX_ON, type StageFx } from "@/casino/scene/fx";
 import { Cabinet3D } from "@/games/slot/ui/three/Cabinet3D";
 import { casino, PLAY_CAMERA, type CabinetHandle, type Quality } from "@/casino/contract";
 import { PAYLINES, SCATTER, STRIP_LEN, type SymbolId } from "@/games/slot/config";
@@ -15,9 +16,13 @@ import { sfx, unlockAudio } from "@/games/slot/ui/sound";
 import { ANTICIPATION_MS, anticipationReel, STAGGER_MS, tierFor, useSlotGame, type ReelsDriver, type SlotGameApi, type Tier } from "@/games/slot/ui/useSlotGame";
 
 /**
- * Dev lab for the cabinet: a stand-in room (floor, key light, a code-built
- * environment, bloom) and buttons that drive the cabinet exactly the way the
- * game does: pull, start, stop with stagger/anticipation, highlight.
+ * Dev lab for the cabinet: the stage's own lights and post chain (so what is
+ * tuned here holds on the real page) over a plain dark floor, and buttons that
+ * drive the cabinet exactly the way the game does: pull, start, stop with
+ * stagger/anticipation, highlight.
+ *
+ * URL params for automated frames: ?view=play|close|wide&quality=high|mid&run=<forced key>
+ * (`window.__labDone` turns true when that run has landed and lit).
  */
 
 type Cells = [number, number][];
@@ -45,10 +50,15 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export function CabinetLab() {
   const cab = useRef<CabinetHandle>(null);
-  const [quality, setQ] = useState<Exclude<Quality, "low">>("high");
+  const [params] = useState(() => (typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search)));
+  const [quality, setQ] = useState<Exclude<Quality, "low">>(params.get("quality") === "mid" ? "mid" : "high");
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState("ready");
-  const [view, setView] = useState<"play" | "close" | "wide">("play");
+  const [view, setView] = useState<"play" | "close" | "wide">(() => {
+    const v = params.get("view");
+    return v === "close" || v === "wide" ? v : "play";
+  });
+  const fxRef = useRef<StageFx>({ ...FX_ON });
   const cam =
     view === "close"
       ? { position: [0.12, 1.36, 1.15] as const, target: [0, 1.32, 0.3] as const }
@@ -94,7 +104,21 @@ export function CabinetLab() {
     }
     setLog(`${tier ?? "loss"}${antic !== null ? " (anticipation)" : ""}: ${grid.map((r) => r.join("/")).join("  |  ")}`);
     setBusy(false);
+    (window as unknown as { __labDone?: boolean }).__labDone = true;
   };
+
+  // ?run=<forced key>: play one forced result once the cabinet is up
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  });
+  useEffect(() => {
+    const key = params.get("run");
+    const v = key ? FORCED[key] : undefined;
+    if (!v) return;
+    const t = setTimeout(() => void runRef.current(v.grid, v.cells, v.tier, v.antic ?? null), 3500);
+    return () => clearTimeout(t);
+  }, [params]);
 
   const random = () => {
     const stops = [0, 1, 2].map(() => Math.floor(Math.random() * STRIP_LEN));
@@ -127,24 +151,7 @@ export function CabinetLab() {
       >
         <color attach="background" args={["#0a0610"]} />
         <fogExp2 attach="fog" args={["#0a0610", 0.09]} />
-        <Environment resolution={256}>
-          <Lightformer form="rect" intensity={2.2} color="#ffd9b8" position={[2, 3, 3]} scale={[3, 2, 1]} target={[0, 1, 0]} />
-          <Lightformer form="rect" intensity={1.6} color="#ff3fae" position={[-3, 1.5, 1]} scale={[1, 3, 1]} target={[0, 1, 0]} />
-          <Lightformer form="rect" intensity={1.2} color="#6e54ff" position={[0, 2, -3]} scale={[4, 1, 1]} target={[0, 1, 0]} />
-          <Lightformer form="ring" intensity={3} color="#fff1d6" position={[0, 5, 1]} scale={1.5} target={[0, 0, 0]} />
-        </Environment>
-        <ambientLight intensity={0.08} color="#6e54ff" />
-        <spotLight
-          position={[1.6, 3.6, 2.6]}
-          angle={0.5}
-          penumbra={0.6}
-          intensity={38}
-          color="#ffd2dc"
-          castShadow={quality === "high"}
-          shadow-mapSize={[1024, 1024]}
-          shadow-bias={-0.0004}
-        />
-        <directionalLight position={[-2, 2, -3]} intensity={0.6} color="#6e54ff" />
+        <Lights fxRef={fxRef} shadows={quality === "high"} />
         <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[20, 20]} />
           <meshStandardMaterial color="#120610" roughness={0.18} metalness={0.2} />
@@ -152,11 +159,7 @@ export function CabinetLab() {
         <Cabinet3D ref={cab} quality={quality} reducedMotion={false} />
         <PerspectiveCamera key={view} makeDefault position={[...cam.position]} fov={PLAY_CAMERA.fov} />
         <OrbitControls key={`o-${view}`} target={[...cam.target]} enableDamping />
-        <EffectComposer multisampling={quality === "high" ? 4 : 0}>
-          <Bloom mipmapBlur luminanceThreshold={0.9} intensity={0.9} />
-          <Vignette darkness={0.55} offset={0.3} />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        </EffectComposer>
+        <Post quality={quality} />
       </Canvas>
 
       <div

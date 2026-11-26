@@ -66,8 +66,12 @@
 }
 .room[data-mode="stage"] .hud {
   margin-top: auto;
-  padding-top: 72px;
-  background: linear-gradient(to top, rgb(10 6 16 / 0.94) 0%, rgb(10 6 16 / 0.78) 55%, transparent 100%);
+  padding-top: 36px;
+  background: linear-gradient(to top, rgb(10 6 16 / 0.92) 0%, rgb(10 6 16 / 0.7) 50%, transparent 100%);
+}
+/* the zoom punch on large wins scales the view from about where the reels sit */
+.room[data-mode="stage"] .stage {
+  transform-origin: 50% 36%;
 }
 
 /* ── the DOM machine (low tier / fallback) ──────────────── */
@@ -230,6 +234,27 @@
   transition: opacity 0.22s var(--ease);
 }
 /* faces sit in gold cameo frames */
+/* art that never arrived: the symbol's name, set like the belly glass */
+.cell:has(img[data-broken]) {
+  display: grid;
+  place-items: center;
+}
+.cell:has(img[data-broken])::before {
+  content: attr(data-label);
+  grid-area: 1 / 1;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--paper);
+  padding: 6px 12px;
+  border-radius: 3px;
+  background: var(--velvet);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+.cell img[data-broken] {
+  visibility: hidden;
+}
 .cell[data-face] img {
   width: 72%;
   height: 72%;
@@ -326,43 +351,55 @@
   will-change: transform, opacity;
 }
 
-/* ── win banner ─────────────────────────────────────────── */
+/* ── win banner: takes the voice line, above the console, never over the reels ── */
+.voiceSlot {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  min-height: 30px;
+  margin: 0 auto 12px;
+  max-width: 640px;
+}
+.voiceSlot:not([data-stage]) {
+  min-height: 0;
+  margin-bottom: 0;
+}
 .banner {
   position: absolute;
-  inset: 0;
-  z-index: 6;
-  display: grid;
-  place-items: center;
+  left: 50%;
+  bottom: -4px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 22px 10px;
+  white-space: nowrap;
   pointer-events: none;
-  padding-bottom: 12vh;
-}
-.bannerInner {
-  text-align: center;
-  padding: 18px 34px 20px;
   border-radius: 3px;
-  background: var(--noise), rgb(26 7 20 / 0.92);
+  background: var(--noise), rgb(26 7 20 / 0.94);
   box-shadow:
     var(--hairline),
-    0 30px 80px -20px #000;
+    0 24px 60px -24px #000;
+  transform: translateX(-50%);
+  /* the counter's companion: it arrives a beat after the line starts drawing */
   transition:
-    opacity 0.32s var(--ease),
-    transform 0.32s var(--ease);
+    opacity 0.28s var(--ease) 0.2s,
+    transform 0.28s var(--ease) 0.2s;
   @starting-style {
     opacity: 0;
-    transform: translateY(8px) scale(0.96);
+    transform: translateX(-50%) translateY(6px) scale(0.97);
   }
 }
 .bannerTitle {
   font-family: var(--f-display);
   font-style: italic;
-  font-size: clamp(18px, 4vw, 24px);
+  font-size: 18px;
   color: var(--paper);
 }
 .bannerAmount {
-  margin-top: 2px;
   font-family: var(--f-display);
   font-weight: 700;
-  font-size: clamp(44px, 10vw, 76px);
+  font-size: 46px;
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: lining-nums tabular-nums;
@@ -379,8 +416,7 @@
   padding: 0 var(--gutter, 16px) 10px;
 }
 .hudVoice {
-  min-height: 30px;
-  margin: 0 auto 14px;
+  margin: 0;
   max-width: 560px;
   font-family: var(--f-display);
   font-style: italic;
@@ -390,6 +426,10 @@
   text-align: center;
   text-wrap: balance;
   text-shadow: 0 1px 12px rgb(10 6 16 / 0.9);
+  transition: opacity 0.2s var(--ease);
+}
+.hudVoice[data-quiet] {
+  opacity: 0;
 }
 .hudRow {
   display: grid;
@@ -409,9 +449,6 @@
   box-shadow:
     var(--hairline),
     0 18px 40px -20px #000;
-}
-.plaque[data-hidden] {
-  visibility: hidden;
 }
 .plaqueCell {
   display: grid;
@@ -579,11 +616,10 @@
   outline-offset: 4px;
 }
 .spin[data-size="slip"] {
-  height: 54px;
+  height: 50px;
   min-width: 0;
-  font-size: 24px;
-  justify-self: start;
-  margin-top: 4px;
+  padding: 0 24px 3px;
+  font-size: 23px;
 }
 @media (hover: hover) and (pointer: fine) {
   .spin:hover:not(:disabled):not([data-busy="true"]) {
@@ -659,17 +695,22 @@
   text-wrap: pretty;
 }
 .hint a,
-.slipBody a:not(.spin) {
+.slipBody a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-/* ── pit slip (signed out, warming up) ──────────────────── */
+/* ── pit slip (signed out, warming up): a compact ticket in the plaque's place ── */
 .slip {
   position: relative;
-  width: min(420px, 100%);
-  padding: 20px 22px 18px;
+  justify-self: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  width: min(500px, 100%);
+  padding: 15px 18px 14px 20px;
   background: var(--noise-paper), var(--paper);
   color: var(--paper-ink);
   box-shadow: 0 24px 50px -24px #000;
@@ -690,40 +731,46 @@
 .slip::after {
   bottom: -4px;
 }
+/* a rubber stamp struck across the top perforation */
 .slipStamp {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 2px 8px;
+  top: -9px;
+  right: 22px;
+  padding: 1px 7px;
   border: 1.5px solid #a3214f;
   border-radius: 2px;
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #a3214f;
-  opacity: 0.85;
-  transform: rotate(-5deg);
+  background: var(--paper);
+  opacity: 0.92;
+  transform: rotate(-4deg);
+}
+.slipText {
+  min-width: 0;
 }
 .slipTitle {
   font-family: var(--f-display);
   font-style: italic;
   font-weight: 600;
-  font-size: 23px;
+  font-size: 21px;
   line-height: 1.15;
-  padding-right: 96px;
+  text-wrap: balance;
 }
 .slipBody {
-  display: grid;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 13.5px;
-  line-height: 1.5;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
   color: #4d3443;
+  text-wrap: pretty;
 }
-.slipBody .brassBtn {
-  justify-self: start;
+.slipAction {
+  display: grid;
+}
+.slipAction .brassBtn {
   color: var(--paper-ink);
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--paper-ink);
@@ -1053,37 +1100,49 @@
   background: rgb(10 6 16 / 0.94);
 }
 
-/* ── small screens ──────────────────────────────────────── */
+/* ── small screens: the HUD stays in the bottom third so the reels above stay clear ── */
 @media (max-width: 760px) {
   .hudRow {
     grid-template-columns: 1fr;
     justify-items: stretch;
-    gap: 12px;
+    gap: 10px;
   }
   .plaque {
     justify-self: stretch;
     grid-template-columns: 1fr 1fr;
   }
-  .plaque[data-hidden] {
-    display: none;
-  }
   .plaqueCell {
-    padding: 9px 12px 10px;
+    gap: 4px;
+    padding: 7px 12px 8px;
+  }
+  .engraved {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+  .balance {
+    font-size: 27px;
+  }
+  .thisSpin {
+    font-size: 17px;
+    line-height: 1.6;
   }
   .console {
     justify-content: center;
     gap: 10px;
   }
+  .console:empty {
+    display: none;
+  }
   .spin {
     min-width: 0;
     flex: 1;
     max-width: 220px;
-    height: 64px;
-    font-size: 27px;
+    height: 58px;
+    font-size: 26px;
   }
   .bet {
-    height: 56px;
-    grid-template-columns: 38px minmax(60px, auto) 38px;
+    height: 54px;
+    grid-template-columns: 38px minmax(56px, auto) 38px;
     padding: 0 7px;
   }
   .betBtn {
@@ -1093,17 +1152,67 @@
   .side {
     justify-self: center;
   }
+  .brassBtn,
+  .iconBtn {
+    height: 36px;
+  }
+  .iconBtn {
+    width: 36px;
+  }
   .domWrap {
     padding-top: 96px;
   }
   .room[data-mode="stage"] .hud {
-    padding-top: 40px;
+    padding-top: 22px;
+  }
+  .voiceSlot {
+    min-height: 24px;
+    margin-bottom: 8px;
+  }
+  .hudVoice {
+    font-size: 16px;
+  }
+  .hint {
+    margin-top: 8px;
+    min-height: 0;
   }
   .slip {
-    justify-self: center;
+    width: 100%;
+    gap: 12px;
+    padding: 13px 14px 12px 16px;
   }
-  .console:has(.slip) {
-    justify-content: stretch;
+  .slipTitle {
+    font-size: 19px;
+  }
+  .slipBody {
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .spin[data-size="slip"] {
+    height: 46px;
+    padding: 0 18px 3px;
+    font-size: 21px;
+  }
+  .banner {
+    gap: 10px;
+    padding: 6px 16px 8px;
+  }
+  .bannerTitle {
+    font-size: 15px;
+  }
+  .bannerAmount {
+    font-size: 36px;
+  }
+  .room[data-mode="stage"] .credits {
+    padding: 4px 16px 10px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+}
+/* touch: there's no space bar to mention, and the spin button explains itself */
+@media (hover: none) {
+  .hint [data-howto] {
+    display: none;
   }
 }
 @media (max-width: 380px) {
@@ -1126,5 +1235,12 @@
   .sheet,
   .scrim {
     transition: none;
+  }
+  .banner {
+    transition: opacity 0.2s ease;
+    @starting-style {
+      opacity: 0;
+      transform: translateX(-50%);
+    }
   }
 }

@@ -43,16 +43,20 @@ export const CHARACTER_HEIGHT = 1.62;
 export type Shot = { id: string; at: number; dur: number; note: string };
 
 export const INTRO_SHOTS: readonly Shot[] = [
-  { id: "sign", at: 0, dur: 1.6, note: "black → the SIMP MACHINE neon flickers on; slow push toward the far aisle" },
-  { id: "track", at: 1.6, dur: 3.4, note: "low tracking shot beside Keone walking down the aisle from the door" },
-  { id: "arc", at: 5.0, dur: 1.8, note: "camera arcs to a three-quarter view of the one lit machine as he arrives" },
-  { id: "sit", at: 6.8, dur: 1.4, note: "he sits; camera pushes in over his right shoulder" },
-  { id: "pull", at: 8.2, dur: 1.8, note: "he pulls the lever for an attract spin; HUD fades in at the end" },
+  { id: "sign", at: 0, dur: 1.4, note: "black → the SIMP MACHINE neon flickers on; slow push down the aisle as he walks in" },
+  { id: "meet", at: 1.4, dur: 2.5, note: "cut: a 45 mm camera backs down the aisle ahead of him; his face, a glance to camera" },
+  { id: "arc", at: 3.9, dur: 1.75, note: "the camera swings round to beside the lit machine as he arrives" },
+  { id: "sit", at: 5.9, dur: 1.9, note: "he hops onto the stool and swivels a quick grin to camera" },
+  { id: "pull", at: 7.8, dur: 2.2, note: "over his right shoulder for the lever; attract spin; settle on the rest frame, HUD fades in" },
 ];
 export const INTRO_LENGTH = 10;
 
-/** final resting camera (over the shoulder, reels readable) — also the reduced-motion frame */
-export const PLAY_CAMERA = { position: [1.55, 1.9, 2.45] as Vec3, target: [0.02, 1.3, 0.3] as Vec3, fov: 38 };
+/**
+ * Final resting camera on a 16:10 desktop (over the shoulder, a 50 mm lens, reels readable past his head).
+ * The stage's director solves this frame per aspect and lens-shifts it above the HUD; this is the
+ * landscape solution, for labs that want a fixed camera.
+ */
+export const PLAY_CAMERA = { position: [2.84, 2.45, 3.21] as Vec3, target: [0.0, 1.4, 0.45] as Vec3, fov: 23 };
 
 // ── the character ───────────────────────────────────────────────────────────
 
@@ -71,6 +75,8 @@ export interface CharacterHandle {
   react(kind: "loss" | "small" | "nice" | "big" | "mega"): void;
   /** jump straight to a state (skip / reduced motion) */
   snap(state: CharacterState): void;
+  /** optional: a look to camera with a grin (seated he swivels the stool), back after `hold` seconds */
+  glance?(hold?: number): void;
 }
 
 // ── the cabinet ─────────────────────────────────────────────────────────────

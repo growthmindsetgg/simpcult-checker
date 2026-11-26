@@ -49,11 +49,15 @@ export function Keone({ ref, quality, onController }: KeoneProps) {
       pullLever: () => ctl.pullLever(),
       react: (kind) => ctl.react(kind),
       snap: (state) => ctl.snap(state),
+      glance: (hold) => ctl.glance(hold),
     }),
     [ctl],
   );
 
-  useFrame((_, dt) => ctl.update(dt));
+  useFrame((state, dt) => {
+    ctl.camPos.copy(state.camera.position);
+    ctl.update(dt);
+  });
 
   return <primitive object={rig.root} />;
 }

@@ -12,13 +12,19 @@ import { useQuality } from "@/casino/quality";
 import { DomMachine } from "./DomMachine";
 import { Paytable } from "./Paytable";
 import { Fairness } from "./Fairness";
-import { fmt, useSlotGame, type ReelsDriver, type SlotGameApi } from "./useSlotGame";
+import { useCabinetClock } from "./three/live";
+import { fmt, useCasino, useSlotGame, type ReelsDriver, type SlotGameApi } from "./useSlotGame";
 import styles from "./slot.module.css";
 
 /** how long the page waits for a 3D stage to register before falling back to the DOM machine */
 const STAGE_GRACE_MS = 15000;
-/** how long a registered stage may keep its intro running before spins unlock anyway */
-const INTRO_GRACE_MS = 16000;
+/**
+ * Intro grace. The main one is 16 s of the stage's own clock (three/live.ts), so a slow device whose
+ * intro runs long in wall time still finishes it. These wall-clock caps only catch a stuck stage:
+ * one that registered but never drew, or one that draws so rarely its clock barely moves.
+ */
+const NO_FRAME_GRACE_MS = 30000;
+const SLOW_STAGE_GRACE_MS = 60000;
 
 type Drawer = "paytable" | "fairness" | null;
 
@@ -33,20 +39,23 @@ export function SlotGame() {
   const stageExpected = (quality === "high" || quality === "mid") && !forceDom;
 
   const domDriver = useRef<ReelsDriver | null>(null);
-  const game = useSlotGame({ domDriver, stageExpected, introGraceOver: introGrace });
-  const { controls, introDone } = game;
+  const { controls, introDone } = useCasino();
+  const clock = useCabinetClock();
 
-  // a stage that never shows up (or never finishes its intro) must not lock the machine
+  // a stage that never shows up must not lock the machine: fall back to the DOM reels
   useEffect(() => {
     if (!stageExpected || controls) return;
     const t = setTimeout(() => setForceDom(true), STAGE_GRACE_MS);
     return () => clearTimeout(t);
   }, [stageExpected, controls]);
+  // nor may a stage whose intro never finishes: 16 s of its own clock, or the wall-clock caps for a stuck one
   useEffect(() => {
     if (!controls || introDone) return;
-    const t = setTimeout(() => setIntroGrace(true), INTRO_GRACE_MS);
+    const t = setTimeout(() => setIntroGrace(true), clock.live ? SLOW_STAGE_GRACE_MS : NO_FRAME_GRACE_MS);
     return () => clearTimeout(t);
-  }, [controls, introDone]);
+  }, [controls, introDone, clock.live]);
+  const graceOver = introGrace || (!!controls && clock.graceOver);
+  const game = useSlotGame({ domDriver, stageExpected, introGraceOver: graceOver });
 
   const [drawer, setDrawer] = useState<Drawer>(null);
 
@@ -67,20 +76,27 @@ export function SlotGame() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // large wins: a zoom punch on the whole view at the moment of impact (game-feel, large tier).
+  // A view-level transform, so the camera stays the director's.
+  const stageEl = useRef<HTMLDivElement>(null);
+  const bannerKey = game.banner?.key;
+  const bannerTier = game.banner?.tier;
+  useEffect(() => {
+    if (!bannerKey || game.reduceMotion || !stageEl.current?.animate) return;
+    const peak = bannerTier === "mega" ? 1.028 : 1.018;
+    const a = stageEl.current.animate([{ transform: "scale(1)" }, { transform: `scale(${peak})`, offset: 0.22 }, { transform: "scale(1)" }], {
+      duration: 420,
+      easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+    });
+    return () => a.cancel();
+  }, [bannerKey, bannerTier, game.reduceMotion]);
+
   const dom = <DomMachine game={game} driverRef={domDriver} />;
 
   return (
     <div className={styles.room} data-mode={stageExpected ? "stage" : "dom"}>
-      <div className={styles.stage}>
+      <div className={styles.stage} ref={stageEl}>
         {stageExpected ? <CasinoLazy mode="play" fallback={dom} className={styles.canvas} /> : <div className={styles.domWrap}>{dom}</div>}
-        {game.banner && (
-          <div className={styles.banner} key={`banner-${game.banner.key}`} data-testid="slot-banner" data-tier={game.banner.tier}>
-            <div className={styles.bannerInner}>
-              <div className={styles.bannerTitle}>{game.banner.tier === "mega" ? "mega simp" : "the machine bows"}</div>
-              <div className={styles.bannerAmount}>+{fmt(game.banner.amount)}</div>
-            </div>
-          </div>
-        )}
       </div>
 
       <Hud game={game} stage={stageExpected} onOpen={setDrawer} />
@@ -112,66 +128,79 @@ export function SlotGame() {
 
 // ── HUD ─────────────────────────────────────────────────────────────────────
 
-function Hud({
-  game,
-  stage,
-  onOpen,
-}: {
-  game: SlotGameApi;
-  stage: boolean;
-  onOpen: (d: Drawer) => void;
-}) {
+function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpen: (d: Drawer) => void }) {
   const { status, spinning, bet, canSpin, canAfford, stageReady, controls } = game;
   const signedOut = status === "signedOut";
   const ready = status === "ready";
   const intro = stage && !stageReady;
+  // which gate opened the machine: the stage's intro finishing, or the grace timer (a stage that stalled)
+  const unlock = !stage ? "dom" : !stageReady ? "locked" : game.introDone ? "intro" : "grace";
 
   return (
-    <div className={styles.hud} data-spinning={spinning}>
-      {stage && (
-        <p className={styles.hudVoice} role="status" aria-live="polite">
-          {game.say}
-        </p>
-      )}
-
-      <div className={styles.hudRow}>
-        {/* the brass plaque: balance and this spin (nothing to show until you're seated) */}
-        <div className={styles.plaque} data-hidden={signedOut || status === "error" || undefined}>
-          <div className={styles.plaqueCell}>
-            <span className={styles.engraved}>your points</span>
-            <span className={styles.balance} data-testid="slot-balance">
-              {ready ? fmt(game.balance) : "—"}
-            </span>
+    <div className={styles.hud} data-spinning={spinning} data-status={status} data-unlock={unlock}>
+      {/* the machine's voice; on a big win the amount takes this line (it never sits over the reels) */}
+      <div className={styles.voiceSlot} data-stage={stage || undefined}>
+        {stage && (
+          <p className={styles.hudVoice} role="status" aria-live="polite" data-quiet={!!game.banner || undefined}>
+            {game.say}
+          </p>
+        )}
+        {game.banner && (
+          <div className={styles.banner} key={`banner-${game.banner.key}`} data-testid="slot-banner" data-tier={game.banner.tier}>
+            <span className={styles.bannerTitle}>{game.banner.tier === "mega" ? "mega simp" : "the machine bows"}</span>
+            <span className={styles.bannerAmount}>+{fmt(game.banner.amount)}</span>
           </div>
-          <div className={styles.plaqueCell} data-zero={game.lastWin === 0}>
-            <span className={styles.engraved}>this spin</span>
-            <span className={styles.thisSpin}>
-              <span id={game.winId} data-testid="slot-win">
-                0
-              </span>
-            </span>
-          </div>
-        </div>
+        )}
+      </div>
 
-        {/* centre: bet + the one neon button, or the slip that explains why not */}
-        <div className={styles.console}>
-          {signedOut ? (
-            <Slip stamp="members only" title="take a seat, simp.">
-              <p>
-                prove your wallet to play. spins use the SIMP Points you earn in the <Link href="/portal">portal</Link>.
-              </p>
+      <div className={styles.hudRow} data-seated={!(signedOut || status === "error") || undefined}>
+        {/* left: the brass plaque once you're seated; until then the ticket that says why not stands in its place */}
+        {signedOut ? (
+          <Slip
+            stamp="members only"
+            title="take a seat, simp."
+            action={
               <Link href="/join" className={styles.spin} data-size="slip">
                 sign in
               </Link>
-            </Slip>
-          ) : status === "error" ? (
-            <Slip stamp="back soon" title="the machine is warming up.">
-              <p>the lights are on, the ledger isn&apos;t answering yet. give it a minute.</p>
+            }
+          >
+            prove your wallet to play. spins use the SIMP Points you earn in the <Link href="/portal">portal</Link>.
+          </Slip>
+        ) : status === "error" ? (
+          <Slip
+            stamp="back soon"
+            title="the machine is warming up."
+            action={
               <button type="button" className={styles.brassBtn} onClick={game.retry}>
                 try again
               </button>
-            </Slip>
-          ) : (
+            }
+          >
+            the lights are on, the ledger isn&apos;t answering yet. give it a minute.
+          </Slip>
+        ) : (
+          <div className={styles.plaque}>
+            <div className={styles.plaqueCell}>
+              <span className={styles.engraved}>your points</span>
+              <span className={styles.balance} data-testid="slot-balance">
+                {ready ? fmt(game.balance) : "—"}
+              </span>
+            </div>
+            <div className={styles.plaqueCell} data-zero={game.lastWin === 0}>
+              <span className={styles.engraved}>this spin</span>
+              <span className={styles.thisSpin}>
+                <span id={game.winId} data-testid="slot-win">
+                  0
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* centre: bet + the one neon button (only once you're seated) */}
+        <div className={styles.console}>
+          {signedOut || status === "error" ? null : (
             <>
               <div className={styles.bet} role="group" aria-label="points per spin">
                 <button
@@ -248,7 +277,7 @@ function Hud({
             not enough points for this spin. lower it, or earn more in the <Link href="/portal">portal</Link>.
           </>
         ) : ready ? (
-          stage ? "pull the lever, or press space" : "spin when ready. space works too."
+          <span data-howto>{stage ? "pull the lever, or press space" : "spin when ready. space works too."}</span>
         ) : signedOut || status === "error" ? null : (
           "spins use SIMP Points only. every outcome is decided on the server, and you can check it."
         )}
@@ -257,12 +286,16 @@ function Hud({
   );
 }
 
-function Slip({ stamp, title, children }: { stamp: string; title: string; children: ReactNode }) {
+/** a cream pit slip: title and one short line on the left, the single action on the right */
+function Slip({ stamp, title, action, children }: { stamp: string; title: string; action: ReactNode; children: ReactNode }) {
   return (
     <div className={styles.slip}>
       <span className={styles.slipStamp}>{stamp}</span>
-      <p className={styles.slipTitle}>{title}</p>
-      <div className={styles.slipBody}>{children}</div>
+      <div className={styles.slipText}>
+        <p className={styles.slipTitle}>{title}</p>
+        <p className={styles.slipBody}>{children}</p>
+      </div>
+      <div className={styles.slipAction}>{action}</div>
     </div>
   );
 }
@@ -286,7 +319,11 @@ function Sheet({ open, title, onClose, children }: { open: boolean; title: strin
     };
   }, [open, onClose]);
   // portalled to <body>: the page template animates a transform, which would trap position: fixed
-  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
   if (!mounted) return null;
   return createPortal(
     <div className={styles.portal}>
@@ -309,7 +346,17 @@ function Sheet({ open, title, onClose, children }: { open: boolean; title: strin
 
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
       {muted ? (
         <path d="M16 9.5l5 5M21 9.5l-5 5" />

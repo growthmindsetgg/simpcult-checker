@@ -43,6 +43,8 @@ const RETRY_DELAY_MS = 700;
 const BREAK_NUDGE_EVERY = 8; // straight losses before the machine suggests a break
 const STOP_TIMEOUT_MS = 9000; // a driver that never resolves (stage torn down mid-spin) can't hold a spin hostage
 const LEVER_TIMEOUT_MS = 1800;
+/** delay before the win counter starts: the cabinet's hit-stop plus a beat of the line drawing */
+const COUNT_LEAD_MS: Partial<Record<Tier, number>> = { nice: 150, big: 230, mega: 260 };
 export const ATTRACT_GRID = gridFromStops([6, 30, 52]);
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; err: SlotError };
@@ -350,6 +352,9 @@ export function useSlotGame({
 
     // one driver for the whole spin, even if the stage comes or goes meanwhile
     const stage = casino.controls;
+    // spinning while the intro still runs (unlocked by the grace timer): end the intro first, so its own
+    // attract spin can't land on the drums after this spin's result
+    if (stage && !casino.introDone) stage.skipIntro();
     const reels: ReelsDriver = stage?.cabinet ?? domDriver.current ?? NOOP_DRIVER;
     reels.highlight([], null);
 
@@ -469,9 +474,24 @@ export function useSlotGame({
     else sfx.win(won);
     if (showBanner) setBanner({ tier: won, amount: res.totalWin, key: Date.now() });
     const ms = reduceMotion ? 0 : won === "mega" ? 2600 : won === "big" ? 1700 : won === "nice" ? 650 : 300;
-    countUp(res.totalWin, ms, () => {
+    const settleBalance = () => {
       if (alive.current && res.balance !== null) setBalance(res.balance);
-    });
+    };
+    // the winning line leads (the cabinet holds for its hit-stop, then draws it); the counter follows a beat later
+    const lead = reduceMotion ? 0 : (COUNT_LEAD_MS[won] ?? 0);
+    if (lead > 0) {
+      const t = setTimeout(() => {
+        countCancel.current = null;
+        countUp(res.totalWin, ms, settleBalance);
+      }, lead);
+      countCancel.current = () => {
+        clearTimeout(t);
+        countCancel.current = null;
+        const el = winNode();
+        if (el) el.textContent = fmt(res.totalWin);
+        settleBalance();
+      };
+    } else countUp(res.totalWin, ms, settleBalance);
     if (showBanner) setTimeout(() => alive.current && setBanner((b) => (b && b.amount === res.totalWin ? null : b)), ms + 1400);
   };
 

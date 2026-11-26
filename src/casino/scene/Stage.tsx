@@ -9,8 +9,9 @@
  * Rendering pauses whenever the stage is offscreen or the tab is hidden.
  */
 import { PerformanceMonitor } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Keone } from "../character/Keone";
 import { Cabinet3D } from "@/games/slot/ui/three/Cabinet3D";
 import { casino, type CabinetHandle, type CharacterHandle, type Quality } from "../contract";
@@ -28,6 +29,20 @@ import styles from "./Stage.module.css";
 
 export type StageMode = "hero" | "play";
 export type StageProps = { mode: StageMode; quality: Exclude<Quality, "low">; reducedMotion: boolean; className?: string };
+
+/**
+ * Exposure per tier. Mid has no shadows, no grain and a CSS vignette in place
+ * of the post one, so it reads brighter at the same exposure.
+ */
+const EXPOSURE: Record<Exclude<Quality, "low">, number> = { high: 1.02, mid: 0.95 };
+
+function Exposure({ value }: { value: number }) {
+  const get = useThree((s) => s.get);
+  useEffect(() => {
+    get().gl.toneMappingExposure = value;
+  }, [get, value]);
+  return null;
+}
 
 function Ready({ onReady }: { onReady(): void }) {
   useEffect(() => {
@@ -107,6 +122,7 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
   }, [introDone]);
 
   const onReady = useCallback(() => setReady(true), []);
+  const skip = useCallback(() => director.current?.skip(), []);
   const onIntroDone = useCallback(() => setIntroDone(true), []);
   const onFreeze = useCallback(() => setFrozen(true), []);
   const stepDown = useCallback(() => {
@@ -126,6 +142,9 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
         dpr={high ? [1, 2] : [1, 1.5]}
         frameloop={visible && !frozen ? "always" : "never"}
         gl={{ antialias: false, alpha: false, stencil: false, powerPreference: "high-performance" }}
+        onCreated={({ gl }) => {
+          gl.toneMappingExposure = EXPOSURE[quality];
+        }}
         camera={{ fov: 30, near: 0.1, far: 40, position: [1.85, 1.05, 12.45] }}
         aria-hidden
       >
@@ -151,16 +170,22 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
           />
           <Ready onReady={onReady} />
         </Suspense>
+        <Exposure value={EXPOSURE[quality]} />
         <Post quality={quality} />
-        {process.env.NODE_ENV !== "production" && <LabHooks freeze={onFreeze} keoneRef={keone} />}
+        {process.env.NODE_ENV !== "production" && <LabHooks freeze={onFreeze} skip={skip} keoneRef={keone} />}
       </Canvas>
       {!high && <div className={styles.vignette} aria-hidden />}
       <div className={`${styles.curtain} ${ready ? styles.curtainUp : ""}`} aria-hidden />
-      {ready && !introDone && (
-        <button type="button" className={styles.skip} onClick={() => director.current?.skip()}>
-          skip intro<kbd>esc</kbd>
-        </button>
-      )}
+      {/* portalled to <body>: the page's copy and the slot HUD stack above the stage's own context */}
+      {ready &&
+        !introDone &&
+        visible &&
+        createPortal(
+          <button type="button" className={styles.skip} data-mode={mode} onClick={skip}>
+            skip intro<kbd>esc</kbd>
+          </button>,
+          document.body,
+        )}
     </div>
   );
 }

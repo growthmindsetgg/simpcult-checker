@@ -53,24 +53,42 @@ export function setFaceOwner(address: string | null) {
   }
   void (async () => {
     try {
-      const r = await fetch(`/api/dao/tokens?address=${a}`);
+      const r = await fetch(`/api/dao/tokens?address=${a}`, { signal: AbortSignal.timeout(6000) });
       if (!r.ok) return;
       const d = (await r.json()) as { tokenIds?: unknown };
       const ids = Array.isArray(d.tokenIds) ? d.tokenIds.filter((n): n is number => Number.isInteger(n) && n >= 0) : [];
       if (ids.length === 0 || owner !== a) return;
       const id = Math.min(...ids);
       const url = `/api/face?id=${id}`;
-      // only switch once the pixels are really there, so no reel ever shows a broken face
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      if (owner !== a) return;
+      // only switch once the pixels are really there, so no reel ever shows a broken face.
+      // The IPFS gateways behind /api/face answer 429 now and then: a miss keeps the tile, and a slow
+      // answer (each gateway gets 6 s server-side) still swaps the face in whenever it arrives.
+      if (!(await decodes(url, FACE_WAIT_MS)) || owner !== a) return;
       state = { you: url, youToken: id };
       emit();
     } catch {
       /* keep the fallback tile */
     }
   })();
+}
+
+/** the reels show the tile meanwhile, so waiting long costs nothing; it only bounds a request that never ends */
+const FACE_WAIT_MS = 30000;
+
+/** true once `src` has loaded and decoded; false on error or after `ms`; never rejects */
+function decodes(src: string, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const t = setTimeout(() => {
+      img.src = "";
+      resolve(false);
+    }, ms);
+    img.src = src;
+    img.decode().then(
+      () => (clearTimeout(t), resolve(true)),
+      () => (clearTimeout(t), resolve(false)),
+    );
+  });
 }
 
 export function getFaces(): Faces {
@@ -101,6 +119,8 @@ export function applyFaces(input: SymbolArtMap, f: Faces): SymbolArtMap {
     "founder-1": {
       ...art["founder-1"],
       src: f.you,
+      // if the face can't be fetched again when the atlas repaints, the manifest tile stands in
+      fallback: art["founder-1"].src,
       alt: f.youToken !== null ? `your face: Simp Cult #${f.youToken}` : art["founder-1"].alt,
     },
   };

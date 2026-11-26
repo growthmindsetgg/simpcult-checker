@@ -85,12 +85,12 @@ void main() {
   vec2 uv = uCell[s] + clamp(p, 0.004, 0.996) * uCellSize;
   vec4 a = texture2D(uMap, uv);
   vec4 b = texture2D(uMapBlur, uv);
-  vec4 c = mix(a, b, uBlur);
-  c.a *= inside;
+  // the atlas is premultiplied, so soft art edges composite without dark fringes
+  vec4 c = mix(a, b, uBlur) * inside;
 
   // printed paper with a faint horizontal grain, which smears while spinning
   float grain = 0.985 + 0.015 * sin(vLocal.y * 180.0 + vSlot * 7.0);
-  vec3 col = mix(uPaper * grain, c.rgb, c.a);
+  vec3 col = uPaper * grain * (1.0 - c.a) + c.rgb;
   col = mix(col, uPaper * 0.92, uBlur * 0.35);
 
   // thin printed rule between symbols
@@ -98,15 +98,18 @@ void main() {
   col *= mix(0.82, 1.0, rule);
 
   col *= mix(1.0, 0.42, st.y);
+  // the drum is lit from behind and below the lip: a soft falloff toward the top and bottom rows
+  col *= vShade * uBright;
+  // win: a thin neon frame inside the cell (this part may bloom), the art itself is only warmed
   float edge = min(min(vLocal.x * uAspect, (1.0 - vLocal.x) * uAspect), min(vLocal.y, 1.0 - vLocal.y));
-  float rim = 1.0 - smoothstep(0.0, 0.07, edge);
-  col += uNeon * st.x * (rim * 2.8 + 0.22);
+  float rim = 1.0 - smoothstep(0.012, 0.05, edge);
+  col += uNeon * st.x * (rim * 3.2 + 0.05);
   // anticipation: the whole reel's rim breathes pink
   float hunt = uHunt * (0.55 + 0.45 * sin(uTime * 14.0));
   float side = 1.0 - smoothstep(0.0, 0.06, min(vLocal.x, 1.0 - vLocal.x));
   col += uNeon * hunt * side * 1.2;
 
-  gl_FragColor = vec4(col * vShade * uBright, 1.0);
+  gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -193,9 +196,9 @@ class Reel {
         uHunt: { value: 0 },
         uTime: { value: 0 },
         uTheta: { value: 0 },
-        uPaper: { value: new THREE.Color("#f4e8d2") },
+        uPaper: { value: new THREE.Color("#efe0c4") },
         uNeon: { value: new THREE.Color("#ff3fae") },
-        uBright: { value: 0.86 },
+        uBright: { value: 0.82 },
       },
       fog: false,
     });
@@ -257,7 +260,7 @@ class Reel {
     });
   }
 
-  highlight(rows: number[], on: boolean) {
+  highlight(rows: number[], on: boolean, now: number) {
     const k = this.restingK();
     this.glowTarget.fill(0);
     this.dimTarget.fill(0);
@@ -266,7 +269,7 @@ class Reel {
     vis.forEach((s, r) => {
       if (rows.includes(r)) {
         this.glowTarget[s] = 1;
-        if (isFace(this.symbols[s])) this.faceFx[s] = { t0: performance.now() / 1000, kind: "wink" };
+        if (isFace(this.symbols[s])) this.faceFx[s] = { t0: now, kind: "wink" };
       } else this.dimTarget[s] = 1;
     });
   }
@@ -383,6 +386,12 @@ export class ReelSystem {
   readonly group = new THREE.Group();
   readonly reels: Reel[];
   private geo = drumGeometry();
+  /**
+   * The drums' own clock (seconds). It only advances in update(), by the dt
+   * the cabinet passes, so a hit-stop can hold the drums for a beat by
+   * passing a scaled dt. Wall-clock timers never drive the drums.
+   */
+  private clock = 0;
 
   constructor(map: THREE.Texture, blur: THREE.Texture) {
     this.reels = Array.from({ length: REELS }, (_, i) => new Reel(i, this.geo, map, blur));
@@ -398,11 +407,16 @@ export class ReelSystem {
   }
 
   startSpin() {
-    const now = performance.now() / 1000;
+    const now = this.clock;
     this.reels.forEach((r, i) => {
-      r.highlight([], false);
+      r.highlight([], false, now);
       r.start(now, i * 0.045);
     });
+  }
+
+  /** what each reel shows right now, grid[reel][row] (only meaningful at rest) */
+  visibleGrid(): SymbolId[][] {
+    return this.reels.map((r) => r.visible().map((s) => r.symbols[s]));
   }
 
   hunt(i: number, on: boolean) {
@@ -416,7 +430,7 @@ export class ReelSystem {
       r.phase = { kind: "spin", speed: SPEED };
       r.speed = SPEED;
     }
-    return r.stop(col, performance.now() / 1000);
+    return r.stop(col, this.clock);
   }
 
   highlight(cells: readonly (readonly [number, number])[], on: boolean) {
@@ -424,12 +438,14 @@ export class ReelSystem {
       r.highlight(
         cells.filter(([reel]) => reel === i).map(([, row]) => row),
         on,
+        this.clock,
       ),
     );
   }
 
   update(dt: number) {
-    const now = performance.now() / 1000;
+    this.clock += dt;
+    const now = this.clock;
     for (const r of this.reels) r.update(now, dt);
   }
 

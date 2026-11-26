@@ -189,6 +189,20 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
     [reduceMotion],
   );
 
+  // art that fails: try its fallback source once, then show the symbol's name set on the cell
+  const onArtError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const u = new URL(img.src, window.location.href);
+    const path = u.pathname + u.search;
+    const a = Object.values(artRef.current).find((v) => v.src === path || v.fallback === path);
+    if (a?.fallback && path !== a.fallback) {
+      img.src = a.fallback;
+      return;
+    }
+    if (a && img.parentElement) img.parentElement.dataset.label = a.label;
+    img.dataset.broken = "1";
+  };
+
   return (
     <div className={styles.reels}>
       {grid.map((col, r) => (
@@ -213,9 +227,10 @@ export function Reels({ grid, art, winCells, dimLosers, anticipate, reduceMotion
                   data-dim={(settled && dimLosers && !win) || undefined}
                   data-face={isFace(id) || undefined}
                   aria-hidden={!settled}
+                  data-label={art[id].label}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- manifest art can be any format/aspect */}
-                  <img src={art[id].src} alt={settled ? art[id].label : ""} draggable={false} decoding="async" />
+                  <img src={art[id].src} alt={settled ? art[id].label : ""} draggable={false} decoding="async" onError={onArtError} />
                 </div>
               );
             })}
