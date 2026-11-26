@@ -456,7 +456,8 @@ function makeGeometry(q: Quality) {
     thigh: new CapsuleGeometry(D.thighR, D.thigh, cap, rad),
     shin: new CapsuleGeometry(D.shinR, D.shin - 0.02, cap, rad),
     upperArm: new CapsuleGeometry(D.upperArmR, D.upperArm, cap, rad),
-    sleeve: new CapsuleGeometry(0.058, 0.06, cap, rad),
+    // tall enough that its dome clears the bare arm's top cap (else a skin patch shows on the shoulder)
+    sleeve: new CapsuleGeometry(0.058, 0.07, cap, rad),
     sleeveHem: new TorusGeometry(0.055, 0.009, hi ? 8 : 5, rad),
     forearm: new CapsuleGeometry(D.forearmR, D.forearm, cap, rad),
     thumb: new CapsuleGeometry(0.019, 0.03, cap, hi ? 10 : 7),
@@ -578,7 +579,7 @@ function buildArm(chest: Group, side: 1 | -1, G: KeoneGeometry, M: KeoneMaterial
   const upperMesh = mesh(G.upperArm, M.skin, upper, cast);
   upperMesh.position.y = -D.upperArm / 2;
   const sleeve = mesh(G.sleeve, M.tee, upper, cast);
-  sleeve.position.y = -0.045;
+  sleeve.position.y = -0.04;
   const cuff = mesh(G.sleeveHem, M.teeRib, upper, cast);
   cuff.rotation.x = Math.PI / 2;
   cuff.position.y = -0.106;
