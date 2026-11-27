@@ -24,8 +24,8 @@ export const DAO_DEPLOYED =
 
 export const SITE = {
   name: "simp cult",
-  domain: process.env.NEXT_PUBLIC_SITE_DOMAIN ?? "simpcult.xyz",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://simpcult.xyz",
+  domain: process.env.NEXT_PUBLIC_SITE_DOMAIN ?? "simpcult.com",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://simpcult.com",
   description:
     "simping for what truly matters, until you actually get it. the simp cult nft collection on monad.",
 };

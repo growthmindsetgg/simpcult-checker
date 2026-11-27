@@ -11,7 +11,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "media-src 'self'",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.monad.xyz https://rpc-mainnet.monadinfra.com https://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.com wss://*.walletconnect.org https://*.reown.com wss://*.reown.com",
+  "connect-src 'self' https://*.monad.xyz https://rpc-mainnet.monadinfra.com https://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.com wss://*.walletconnect.org https://*.reown.com wss://*.reown.com https://api.web3modal.org",
   "frame-src 'self' https://verify.walletconnect.com https://verify.walletconnect.org https://verify.reown.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
