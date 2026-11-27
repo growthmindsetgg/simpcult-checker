@@ -4,8 +4,21 @@
   inset: 0 0 auto;
   z-index: 40;
   padding-top: env(safe-area-inset-top);
-  background-color: rgba(10, 6, 16, 0.94);
-  transition: background-color 0.3s ease;
+}
+/* the bar's glass lives on a pseudo-element: backdrop-filter on .nav itself would make
+   it the containing block for the fixed mobile menu and squash the menu into the bar */
+.nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: rgba(33, 15, 48, 0.92);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition:
+    background-color 200ms ease,
+    opacity 200ms ease;
+  pointer-events: none;
 }
 /* brass hairline that fades out toward the edges */
 .nav::after {
@@ -14,18 +27,19 @@
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(217, 168, 69, 0.45) 18%, rgba(217, 168, 69, 0.45) 82%, transparent);
-  transition: opacity 0.3s ease;
+  background: linear-gradient(90deg, transparent, rgba(217, 168, 69, 0.5) 18%, rgba(217, 168, 69, 0.5) 82%, transparent);
+  transition: opacity 200ms ease;
 }
-.nav[data-clear="true"] {
-  background-color: rgba(10, 6, 16, 0);
-}
+/* at the very top the bar is clear: the page (or the hero) shows through untouched */
+.nav[data-clear="true"]::before,
 .nav[data-clear="true"]::after {
   opacity: 0;
 }
-.nav[data-open="true"] {
-  background-color: var(--ink);
+.nav[data-open="true"]::before {
+  background-color: var(--velvet-lo);
+  opacity: 1;
 }
 
 .bar {
@@ -212,10 +226,8 @@
   padding: calc(64px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
     max(var(--gutter), env(safe-area-inset-left));
   background:
-    var(--noise),
-    radial-gradient(90% 50% at 50% 0%, rgba(74, 18, 54, 0.55), transparent 70%),
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 38px, rgba(255, 255, 255, 0.015) 38px 40px),
-    var(--velvet-lo);
+    radial-gradient(90% 45% at 50% 0%, rgba(110, 84, 255, 0.28), transparent 70%),
+    linear-gradient(180deg, #2e1642 0%, var(--ink) 60%);
   clip-path: inset(0 0 100% 0);
   visibility: hidden;
   transition:
@@ -237,10 +249,12 @@
   padding-top: 28px;
 }
 .menuKicker {
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 16px;
-  color: var(--gold);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--monad-text);
 }
 .menuList {
   margin-top: 14px;
@@ -322,27 +336,29 @@
   position: relative;
   margin-top: auto;
   padding-bottom: env(safe-area-inset-bottom);
-  background: linear-gradient(180deg, #0c0612 0%, #08040b 100%);
-  border-top: 1px solid rgba(217, 168, 69, 0.22);
+  background:
+    radial-gradient(60% 80% at 15% 0%, rgba(110, 84, 255, 0.16), transparent 70%),
+    var(--deep);
+  border-top: 1px solid rgba(217, 168, 69, 0.3);
   color: var(--text-2);
   font-size: 14px;
 }
 .footInner {
   display: grid;
   gap: 48px;
-  padding-block: 72px 40px;
+  padding-block: 64px 40px;
 }
 @media (min-width: 900px) {
   .footInner {
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     gap: 64px;
-    padding-block: 96px 48px;
+    padding-block: 88px 48px;
   }
 }
 .footBrand {
   display: grid;
   justify-items: start;
-  gap: 28px;
+  gap: 22px;
   align-content: start;
 }
 .motto {
@@ -350,12 +366,51 @@
   font-optical-sizing: auto;
   font-style: italic;
   font-weight: 500;
-  font-size: clamp(30px, 3.6vw, 46px);
-  line-height: 1.06;
-  letter-spacing: -0.025em;
+  font-size: clamp(22px, 2vw, 27px);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
   color: var(--text);
-  max-width: 17ch;
+  max-width: 24ch;
   text-wrap: balance;
+}
+/* the closing call, folded into the footer: one key, one quiet way out */
+.footCall {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+  margin-top: 10px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(217, 168, 69, 0.18);
+}
+.footCall p {
+  max-width: 38ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+.footKeys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+.footQuiet {
+  padding-block: 10px;
+  color: var(--gold-hi);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.28em;
+  text-decoration-color: rgb(217 168 69 / 0.45);
+  transition:
+    color 0.2s ease,
+    text-decoration-color 0.2s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .footQuiet:hover {
+    color: #fffaf0;
+    text-decoration-color: var(--gold-hi);
+  }
 }
 .footCols {
   display: grid;
@@ -365,11 +420,12 @@
 }
 .footCols h2 {
   margin-bottom: 14px;
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 16px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
   font-weight: 500;
-  color: var(--gold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--monad-text);
 }
 .footCols li + li {
   margin-top: 9px;
@@ -401,7 +457,7 @@
   display: grid;
   gap: 10px;
   padding-block: 22px 28px;
-  border-top: 1px solid rgba(217, 168, 69, 0.12);
+  border-top: 1px solid rgba(217, 168, 69, 0.16);
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--text-3);

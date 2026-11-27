@@ -1,4 +1,9 @@
-/** "Velvet room at 3am" palette, shared with the DOM (see casino art direction). */
+/**
+ * Scene palette. "Velvet room, house lights up": the velvet and brass stay,
+ * the void around them becomes plum, and the Monad brand colours light it
+ * (lavender overhead, Monad purple wash, a cyan kicker, amber practicals).
+ * Pink stays the neon and the win colour.
+ */
 export const C = {
   ink: "#0a0610",
   velvet: "#2a0b1f",
@@ -10,7 +15,19 @@ export const C = {
   goldLo: "#7a5418",
   monad: "#6e54ff",
   paper: "#f1e4cc",
+  /** the room's base: background and the far end of the aisle */
+  plum: "#29133a",
+  /** the haze the room recedes into */
+  fog: "#3a1d52",
+  /** Monad lavender: the overhead light */
+  lavender: "#ddd7fe",
+  /** Monad cyan: the cool kicker on chrome and brass edges */
+  cyan: "#85e6ff",
+  /** Monad amber: the practical lamps */
+  amber: "#ffae45",
+  /** Monad hot pink: the curtain wash */
+  pinkHot: "#ff8ee4",
 } as const;
 
-/** Fog density (exp2). Tuned so the far end of the aisle (≈12 m) is mostly haze. */
-export const FOG_DENSITY = 0.055;
+/** Fog density (exp2). Lighter than before: the aisle recedes into plum haze, not into black. */
+export const FOG_DENSITY = 0.04;

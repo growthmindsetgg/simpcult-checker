@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useAccount } from "wagmi";
 import { DAO_ADDRESS, DAO_DEPLOYED, explorerAddress, short } from "@/lib/config";
 import { useDaoConfig, useProposals, deriveState } from "@/lib/dao";
 import { useSession } from "@/lib/useSession";
@@ -17,6 +18,8 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
   const cfg = useDaoConfig();
   const props = useProposals(cfg.data?.count);
   const { session, isHolder } = useSession();
+  // a server session alone (the walletless "send a transaction" sign-in) cannot propose: that needs a connected wallet
+  const { isConnected } = useAccount();
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<"live" | "past" | "archive">("live");
   const mounted = useMounted();
@@ -30,13 +33,12 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
   return (
     <section className="page max-w-5xl">
       <PageHeader
-        eyebrow="on-chain, on monad"
-        title="simp dao"
-        lead="one nft, one vote. holders open proposals, holders decide. every vote is a monad transaction, so nobody edits history."
+        title="Simp DAO"
+        lead="One NFT, one vote. Holders open proposals, holders decide. Every vote is a Monad transaction, so nobody edits history."
         aside={
-          mounted && session && isHolder ? (
+          mounted && session && isHolder && isConnected ? (
             <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!DAO_DEPLOYED}>
-              new proposal
+              New proposal
             </button>
           ) : (
             <WalletButton />
@@ -48,17 +50,20 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       {/* not live yet. to go live: deploy contracts/SimpDAO.sol and set NEXT_PUBLIC_DAO_ADDRESS;
           proposals then show up here on their own. */}
       {!DAO_DEPLOYED && (
-        <p className="glass mt-10 px-6 py-5 font-serif text-[19px] italic leading-snug text-dim">
-          voting opens when the dao contract is live on monad.
-        </p>
+        <div className="on-light mt-10 flex flex-wrap items-baseline gap-x-5 gap-y-1.5 rounded-[var(--key-radius-xl)] bg-[var(--lav)] px-6 py-5 shadow-[0_24px_50px_-28px_rgba(14,9,28,0.8)]">
+          <span className="t-caps text-[var(--lav-ink-2)]">Not open yet</span>
+          <p className="font-serif text-[19px] italic leading-snug text-[var(--lav-ink)]">
+            Voting opens when the DAO contract is live on Monad.
+          </p>
+        </div>
       )}
 
       {DAO_DEPLOYED && cfg.data && cfg.data.period > 0 && (
         <div className="mono mt-8 flex flex-wrap gap-x-7 gap-y-2 text-[12.5px] text-mute">
-          <span>quorum <b className="text-dim">{cfg.data.quorum} votes</b></span>
-          <span>voting period <b className="text-dim">{Math.round(cfg.data.period / 3600)}h</b></span>
-          <span>to propose <b className="text-dim">≥ {cfg.data.threshold} nft</b></span>
-          <span>contract <a className="link mono" href={explorerAddress(DAO_ADDRESS)} target="_blank" rel="noreferrer">{short(DAO_ADDRESS)}</a></span>
+          <span>Quorum <b className="text-dim">{cfg.data.quorum} votes</b></span>
+          <span>Voting period <b className="text-dim">{Math.round(cfg.data.period / 3600)}h</b></span>
+          <span>To propose <b className="text-dim">≥ {cfg.data.threshold} nft</b></span>
+          <span>Contract <a className="link mono" href={explorerAddress(DAO_ADDRESS)} target="_blank" rel="noreferrer">{short(DAO_ADDRESS)}</a></span>
         </div>
       )}
 
@@ -67,21 +72,21 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       <div className="segment mt-12">
         {(["live", "past", "archive"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} data-active={tab === t}>
-            {t}
+            {t[0].toUpperCase() + t.slice(1)}
             <span className="num">{t === "live" ? live.length : t === "past" ? past.length : shownArchive.length}</span>
           </button>
         ))}
       </div>
 
       <Stagger key={tab} className="mt-7 grid gap-5 md:grid-cols-2">
-        {tab === "live" && (live.length ? live.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text={!mounted || props.isLoading ? "loading proposals…" : "no live proposals. holders can open one."} />)}
-        {tab === "past" && (past.length ? past.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text="nothing has closed yet." />)}
-        {tab === "archive" && (shownArchive.length ? shownArchive.map((a) => <ArchiveCard key={a.id} a={a} />) : <Empty text="votes held before the on-chain dao will be listed here." />)}
+        {tab === "live" && (live.length ? live.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text={!mounted || props.isLoading ? "Loading proposals…" : "No live proposals. Holders can open one."} />)}
+        {tab === "past" && (past.length ? past.map((p) => <ProposalCard key={p.id} p={p} quorum={quorum} />) : <Empty text="Nothing has closed yet." />)}
+        {tab === "archive" && (shownArchive.length ? shownArchive.map((a) => <ArchiveCard key={a.id} a={a} />) : <Empty text="Votes held before the on-chain DAO will be listed here." />)}
       </Stagger>
 
       <NewProposal open={creating} onClose={() => setCreating(false)} />
       <p className="mt-12 text-[13px] text-mute">
-        not verified yet? sign in from the wallet menu or on the{" "}
+        Not verified yet? Sign in from the wallet menu or on the{" "}
         <Link href="/join" className="link">
           join page
         </Link>

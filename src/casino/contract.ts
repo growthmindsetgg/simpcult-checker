@@ -43,13 +43,11 @@ export const CHARACTER_HEIGHT = 1.62;
 export type Shot = { id: string; at: number; dur: number; note: string };
 
 export const INTRO_SHOTS: readonly Shot[] = [
-  { id: "sign", at: 0, dur: 1.4, note: "black → the SIMP MACHINE neon flickers on; slow push down the aisle as he walks in" },
-  { id: "meet", at: 1.4, dur: 2.5, note: "cut: a 45 mm camera backs down the aisle ahead of him; his face, a glance to camera" },
-  { id: "arc", at: 3.9, dur: 1.75, note: "the camera swings round to beside the lit machine as he arrives" },
-  { id: "sit", at: 5.9, dur: 1.9, note: "he hops onto the stool and swivels a quick grin to camera" },
-  { id: "pull", at: 7.8, dur: 2.2, note: "over his right shoulder for the lever; attract spin; settle on the rest frame, HUD fades in" },
+  { id: "sign", at: 0, dur: 0.9, note: "the resting frame at half light; the SIMP MACHINE neon stutters on" },
+  { id: "lights", at: 0.9, dur: 0.9, note: "the house lights come up in three steps, the key spot with them; spins unlock" },
 ];
-export const INTRO_LENGTH = 10;
+/** seconds; the home hero paints a poster of the resting frame underneath, so the intro never starts from black */
+export const INTRO_LENGTH = 1.8;
 
 /**
  * Final resting camera on a 16:10 desktop (over the shoulder, a 50 mm lens, reels readable past his head).

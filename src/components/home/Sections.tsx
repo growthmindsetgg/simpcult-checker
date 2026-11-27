@@ -2,10 +2,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { MONAD_CARD_ENABLED, POINTS_CONFIG, POOLS, seasonBudget, type PoolId } from "@/lib/points/config";
 import { LINKS } from "@/lib/config";
-import { Reveal } from "@/components/motion";
 import { Heart } from "@/components/Logo";
 import { Dealt } from "./Dealt";
 import s from "./home.module.css";
+
+/*
+ * The home page after the hero, one layout per section (no repeated template):
+ *   earn    night band   three slips dealt across the counter
+ *   house   lavender     one cream pay-table card
+ *   lore    Monad fill   one compact strip of dates
+ *   wall    lavender     the collection, full bleed (the only plates on the page)
+ * The closing call lives in the footer.
+ */
 
 const whole = new Intl.NumberFormat("en");
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
@@ -18,40 +26,41 @@ export function Earn() {
   const capDay = Math.round(R.checkin.maxStreakBonus / R.checkin.streakBonusPerDay) + 1;
   return (
     <section id="earn" className={`section ${s.earn}`} aria-labelledby="earn-title">
-      <div className={`shell ${s.earnGrid}`}>
-        <Reveal className={s.earnCopy}>
-          <h2 id="earn-title" className={s.h2}>
-            how a simp earns.
+      <div className="shell">
+        <header className={s.earnHead}>
+          <h2 id="earn-title" className={`t-caps ${s.label}`}>
+            How a simp earns
           </h2>
-          <p className={s.lead}>
-            three habits. the portal counts every one of them, and the count is paid in SIMP&nbsp;Points. no forms, no quests, no
-            grinding a dashboard.
+          <p className={s.earnLead}>
+            Three habits. Each day’s points are shared by everyone who shows up, weighted by what you did. Quiet days pay
+            more each.
           </p>
-          <Link href="/portal" className="link">
-            open the portal
+          <p className={s.earnNote}>Add your Telegram for 3× weight on every check-in and post.</p>
+          <Link href="/portal" className={`link ${s.earnLink}`}>
+            Open the portal
           </Link>
-        </Reveal>
+        </header>
 
         <Dealt className={s.slips}>
           {/* 1 · the daily habit: the biggest slip, because it's the one that matters */}
           <article className={`${s.ticket} ${s.ticketA}`} aria-labelledby="t-checkin">
             <div className={s.paper}>
               <div className={s.ticketBody}>
-                <p className={s.ticketSerial}>daily, resets 00:00 utc</p>
+                <p className={s.ticketSerial}>Daily, resets 00:00 UTC</p>
                 <h3 id="t-checkin" className={s.ticketTitle}>
-                  say gsimp
+                  Say gsimp
                 </h3>
                 <dl className={s.ledger}>
                   <div>
-                    <dt>check in</dt>
-                    <dd>+{whole.format(R.checkin.base)}</dd>
+                    <dt>Check in</dt>
+                    <dd>weight {whole.format(R.checkin.base)}</dd>
                   </div>
                   <div>
-                    <dt>streak bonus</dt>
-                    <dd>+{Math.round(R.checkin.streakBonusPerDay * 100)}% a day</dd>
+                    <dt>Streak bonus</dt>
+                    <dd>+{Math.round(R.checkin.streakBonusPerDay * 100)}% weight a day</dd>
                   </div>
                   <div>
-                    <dt>ceiling</dt>
+                    <dt>Ceiling</dt>
                     <dd>
                       {cap}× from day {capDay}
                     </dd>
@@ -59,7 +68,7 @@ export function Earn() {
                 </dl>
               </div>
               <div className={s.ticketStub} aria-hidden>
-                <span>admit one</span>
+                <span>Admit one</span>
               </div>
               <span className={s.stamp} aria-hidden>
                 <Heart className={s.stampHeart} />
@@ -72,14 +81,17 @@ export function Earn() {
           <article className={`${s.ticket} ${s.ticketB}`} aria-labelledby="t-post">
             <div className={s.paper}>
               <div className={s.ticketBody}>
-                <p className={s.ticketSerial}>up to {R.xPost.dailyCap} a day</p>
+                <p className={s.ticketSerial}>Up to {R.xPost.dailyCap} a day</p>
                 <h3 id="t-post" className={s.ticketTitle}>
-                  post on x
+                  Post on X
                 </h3>
-                <p className={s.ticketNote}>talk about the cult, drop the link in the portal. the bot reads it and pays out.</p>
+                <p className={s.ticketNote}>
+                  Talk about the cult, drop the link in the portal. The bot reads it, pays a slice now and your share of the
+                  day’s pool at midnight UTC.
+                </p>
                 <p className={s.ticketBig}>
-                  +{whole.format(R.xPost.reward)}
-                  <small> a post</small>
+                  {whole.format(R.xPost.reward)}
+                  <small> weight a post</small>
                 </p>
               </div>
             </div>
@@ -87,12 +99,12 @@ export function Earn() {
 
           {/* 3 · alpha: brass, because a human reads it */}
           <article className={s.plaque} aria-labelledby="t-alpha">
-            <p className={s.plaqueKicker}>reviewed weekly by the cabal</p>
+            <p className={s.plaqueKicker}>Reviewed weekly by the cabal</p>
             <h3 id="t-alpha" className={s.plaqueTitle}>
-              bring alpha
+              Bring alpha
             </h3>
             <p className={s.plaqueNote}>
-              a thread, a tool, a find worth reading. up to <b>{whole.format(R.alpha.max)}</b> points each.
+              A thread, a tool, a find worth reading. Weighs up to <b>{whole.format(R.alpha.max)}</b> in the day’s pool.
             </p>
           </article>
         </Dealt>
@@ -101,15 +113,21 @@ export function Earn() {
   );
 }
 
-/* ── the house rules: the split + the halving, engraved ───────────── */
+/* ── the house rules: one printed pay table ───────────────────────── */
 const POOL_COPY: Record<PoolId, { name: string; body: string }> = {
-  active: { name: "active simps", body: "holders who show up: check-ins, posts, alpha." },
-  holding: { name: "loyal holders", body: "just hold. paid per nft, every day of the season." },
+  active: {
+    name: "Active simps",
+    body: "Holders who show up: check-ins, posts, alpha. 10% is shared out day by day; 90% is split at season end among holders who post in the final 48 hours.",
+  },
+  holding: {
+    name: "Loyal holders",
+    body: "Just hold. Counted per NFT every day, paid once at season end. Hold through 5 surprise snapshots.",
+  },
   monad: {
-    name: "monad card holders",
+    name: "Community",
     body: MONAD_CARD_ENABLED
-      ? "say “simp” on x, submit the post, get points."
-      : "opening soon. say “simp” on x and get points for it.",
+      ? "Monad Card holders (9%) and active Monad users with 50+ transactions (1%). Say “simp” on X and submit the post. Same daily and season-end split."
+      : "Active Monad users with 50+ transactions: say “simp” on X and submit the post. Monad Card holders join when the card opens.",
   },
 };
 
@@ -117,30 +135,32 @@ export function House() {
   const seasons = Array.from({ length: 6 }, (_, i) => ({ n: i + 1, budget: seasonBudget(i + 1) }));
   const weeks = POINTS_CONFIG.season.lengthDays / 7;
   return (
-    <section id="house" className={`section ${s.houseSection}`} aria-labelledby="house-title">
+    <section id="house" className={`section band-lav on-light ${s.house}`} aria-labelledby="house-title">
       <div className="shell">
-        <div className={s.board}>
-          <header className={s.boardHead}>
-            <h2 id="house-title" className={s.h2}>
-              the house rules
+        <article className={s.card}>
+          <header className={s.cardHead}>
+            <h2 id="house-title" className={s.cardTitle}>
+              The house rules
             </h2>
-            <p className={s.boardLead}>
-              {whole.format(POINTS_CONFIG.supply)} SIMP&nbsp;Points, ever. this is where they go and when.
+            <p className={s.cardLead}>
+              <span className={s.cardFigure}>{whole.format(POINTS_CONFIG.supply)}</span> SIMP&nbsp;Points, ever. Here is where
+              they go, season by season.
             </p>
           </header>
 
-          <div className={s.boardGrid}>
+          <div className={s.cardGrid}>
             <div>
-              <h3 className={s.boardLabel}>who gets them</h3>
+              <h3 className={`t-caps ${s.cardLabel}`}>Who gets them</h3>
               <dl className={s.split}>
                 {POOLS.map((p) => (
-                  <div key={p} className={s.splitRow} data-pool={p}>
+                  <div key={p} className={s.splitRow}>
                     <dt>
+                      <span className={s.splitName}>{POOL_COPY[p].name}</span>
+                      <span className={s.splitLeader} aria-hidden />
                       <span className={s.splitNum}>
                         {pct(p)}
                         <span className={s.splitPct}>%</span>
                       </span>
-                      <span className={s.splitName}>{POOL_COPY[p].name}</span>
                     </dt>
                     <dd>{POOL_COPY[p].body}</dd>
                   </div>
@@ -149,15 +169,15 @@ export function House() {
             </div>
 
             <div className={s.seasonsCol}>
-              <h3 className={s.boardLabel}>when they drop</h3>
+              <h3 className={`t-caps ${s.cardLabel}`}>Season by season</h3>
               <p className={s.seasonCopy}>
-                season one pays out {compact.format(seasons[0].budget)}. every {weeks} weeks the next season pays half the last.
-                it never runs dry and it never goes over.
+                Season one pays out {compact.format(seasons[0].budget)}. Every {weeks} weeks the next season pays half the last. It
+                never runs dry and it never goes over.
               </p>
               <figure className={s.chips}>
                 <div className={s.chipRow}>
                   {seasons.map((x) => {
-                    const count = Math.max(1, Math.round(24 * (x.budget / seasons[0].budget)));
+                    const count = Math.max(1, Math.round(22 * (x.budget / seasons[0].budget)));
                     return (
                       <div key={x.n} className={s.chipCol}>
                         <div className={s.stack} style={{ "--n": count } as React.CSSProperties}>
@@ -166,49 +186,49 @@ export function House() {
                           ))}
                         </div>
                         <span className={s.chipVal}>{compact.format(x.budget)}</span>
-                        <span className={s.chipSeason}>s{x.n}</span>
+                        <span className={s.chipSeason}>S{x.n}</span>
                       </div>
                     );
                   })}
                   <div className={s.chipCol} aria-hidden>
                     <div className={s.stackGhost} />
                     <span className={s.chipVal}>…</span>
-                    <span className={s.chipSeason}>forever</span>
+                    <span className={s.chipSeason}>Forever</span>
                   </div>
                 </div>
                 <figcaption className="sr-only">
-                  points released per season: {seasons.map((x) => `season ${x.n} ${compact.format(x.budget)}`).join(", ")},
+                  Points released per season: {seasons.map((x) => `season ${x.n} ${compact.format(x.budget)}`).join(", ")},
                   halving forever.
                 </figcaption>
               </figure>
-              <p className={s.wink}>points that might mean something someday.</p>
             </div>
           </div>
-        </div>
+
+          <p className={s.wink}>Points for the record. Nothing more, nothing less.</p>
+        </article>
       </div>
     </section>
   );
 }
 
-/* ── lore ─────────────────────────────────────────────────────────── */
+/* ── lore: one strip of dates on Monad purple ─────────────────────── */
 const YEARS = [
-  { y: "1903", t: "a simp is a simpleton. we're carrying on the family business." },
-  { y: "1980s", t: "west coast rap makes it mean soft-hearted. guilty." },
-  { y: "2020", t: "“ok simp.” crypto twitter learns the word in about an hour." },
-  { y: "2025", t: "421 simps deploy on monad's mainnet day. the word becomes a vow." },
+  { y: "1903", t: "A simp is a simpleton. We’re carrying on the family business." },
+  { y: "1980s", t: "West Coast rap makes it mean soft-hearted. Guilty." },
+  { y: "2020", t: "“Ok simp.” Crypto Twitter learns the word in about an hour." },
+  { y: "2025", t: "421 simps deploy on Monad’s mainnet day. The word becomes a vow." },
 ];
 
 export function Lore() {
   return (
-    <section id="lore" className={`section ${s.lore}`} aria-labelledby="lore-title">
+    <section id="lore" className={`band-monad ${s.lore}`} aria-labelledby="lore-title">
       <div className={`shell ${s.loreGrid}`}>
         <div className={s.loreHead}>
-          <h2 id="lore-title" className={s.loreTitle}>
-            once an insult. now a vow.
+          <h2 id="lore-title" className={`t-caps ${s.loreLabel}`}>
+            Once an insult, now a vow
           </h2>
-          <p className={s.lead}>
-            a simp shows up every day for the thing they believe in, long before it&rsquo;s cool. not for a person. for the chain,
-            the cult, the craft. the machine just keeps score.
+          <p className={s.loreLead}>
+            A simp shows up every day for the thing they believe in, long before it’s cool. The machine just keeps score.
           </p>
         </div>
         <ol className={s.years}>
@@ -224,79 +244,60 @@ export function Lore() {
   );
 }
 
-/* ── the collection: a wall of brass frames ───────────────────────── */
+/* ── the collection: full-bleed wall on a lavender field ──────────── */
 const PORTRAITS = [137, 1, 81, 300, 390, 421];
 
 export function Portraits() {
   return (
-    <section id="collection" className={`section ${s.portraits}`} aria-labelledby="nft-title">
-      <div className={`shell ${s.portraitGrid}`}>
-        <div className={s.portraitCopy}>
-          <h2 id="nft-title" className={s.h2}>
-            421 simps hang on this wall.
-          </h2>
-          <p className={s.lead}>holding one puts you in two of the three point pools, the holders&rsquo; chat and the dao.</p>
+    <section id="collection" className={`section band-lav on-light ${s.wallSection}`} aria-labelledby="nft-title">
+      <div className={`shell ${s.wallHead}`}>
+        <h2 id="nft-title" className={s.wallTitle}>
+          421 simps hang on this wall.
+        </h2>
+        <div className={s.wallSide}>
+          <p className={s.wallLead}>Holding one puts you in two of the three point pools, the holders’ chat and the DAO.</p>
           <ul className={s.doors}>
             <li>
               <Link href="/join" className="link">
-                join the holders&rsquo; chat
+                Join the holders’ chat
               </Link>
             </li>
             <li>
               <Link href="/dao" className="link">
-                vote in the simp dao
+                Vote in the Simp DAO
               </Link>
             </li>
             <li>
               <a href={LINKS.opensea} target="_blank" rel="noreferrer" className="link">
-                browse the collection
+                Browse the collection
               </a>
             </li>
           </ul>
         </div>
-        <ul className={s.wall}>
-          {PORTRAITS.map((n, i) => (
-            <li key={n} className={i === 0 ? `${s.cell} ${s.cellBig}` : s.cell}>
-              <div className={s.brass}>
-                <div className={s.mat}>
-                  <Image
-                    src={`/media/nft/simp-${n}.webp`}
-                    alt={`simp cult #${n}`}
-                    width={480}
-                    height={480}
-                    sizes={i === 0 ? "(min-width: 900px) 30vw, 66vw" : "(min-width: 900px) 14vw, 33vw"}
-                  />
-                </div>
-              </div>
-              <span className="plate">no. {n}</span>
-            </li>
-          ))}
-        </ul>
       </div>
+      <ul className={s.wall}>
+        {PORTRAITS.map((n) => (
+          <li key={n} className={s.cell}>
+            <div className={s.brass}>
+              <div className={s.mat}>
+                <Image
+                  src={`/media/nft/simp-${n}.webp`}
+                  alt={`Simp Cult #${n}`}
+                  width={480}
+                  height={480}
+                  sizes="(min-width: 900px) 16vw, 33vw"
+                />
+              </div>
+            </div>
+            <span className="plate num">No. {n}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
 
-/* ── closing ──────────────────────────────────────────────────────── */
+/* ── closing: folded into the footer (FooterCall). kept as an export for page.tsx ── */
 export function Finale() {
-  return (
-    <section className={`section ${s.finale}`} aria-labelledby="finale-title">
-      <div className={`shell ${s.finaleInner}`}>
-        <h2 id="finale-title" className={s.finaleTitle}>
-          the machine is warm.
-        </h2>
-        <div className={s.finaleSide}>
-          <p className={s.lead}>check in today and your streak starts today. tomorrow it&rsquo;s a day shorter.</p>
-          <div className={s.heroActions}>
-            <Link href="/portal" className="btn btn-primary btn-lg">
-              say gsimp
-            </Link>
-            <Link href="/games/slot" className={s.quietCta}>
-              or pull the lever
-            </Link>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+  return null;
 }

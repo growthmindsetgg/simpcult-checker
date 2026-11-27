@@ -4,22 +4,22 @@
  * footring sits where Keone's seated soles land (FOOTRING in character/dims).
  */
 import { useMemo } from "react";
-import { Color, MeshPhysicalMaterial, MeshStandardMaterial } from "three";
+import { Color, MeshPhysicalMaterial } from "three";
 import { FOOTRING } from "../character/dims";
 import { ANCHORS, SEAT_HEIGHT } from "../contract";
-import { C } from "./palette";
+import { brassMaterial } from "./brass";
 
 export function Stool({ shadows }: { shadows: boolean }) {
   const m = useMemo(
     () => ({
-      brass: new MeshStandardMaterial({ color: C.gold, metalness: 1, roughness: 0.26 }),
-      // the footring is scuffed where shoes rest: a touch rougher than the post
-      brassWorn: new MeshStandardMaterial({ color: "#c99a3f", metalness: 1, roughness: 0.34 }),
+      brass: brassMaterial(0.14),
+      // the footring is scuffed where shoes rest: a touch rougher and darker than the post
+      brassWorn: brassMaterial(0.24, 0.85),
       velvet: new MeshPhysicalMaterial({
-        color: "#3a0d2a",
+        color: "#4a1238",
         roughness: 0.78,
         sheen: 1,
-        sheenColor: new Color(C.velvetHi),
+        sheenColor: new Color("#8a3270"),
         sheenRoughness: 0.4,
       }),
     }),

@@ -275,7 +275,7 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
         color: COLORS.lacquer,
         roughness: 0.42,
         clearcoat: 1,
-        clearcoatRoughness: 0.07,
+        clearcoatRoughness: 0.03,
         envMap: env,
         envMapIntensity: 0.7,
       }),
@@ -326,14 +326,17 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
     });
     const reelGlassShade = glassShadeMaterial(WIN_W / WIN_H);
     const reelGlassSheen = glassSheenMaterial();
-    const ball = new THREE.MeshPhysicalMaterial({
-      color: "#a50f45",
-      roughness: 0.18,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
-      envMap: env,
-      envMapIntensity: 0.8,
-    });
+    // the lever ball's key-light glint is capped like the brass, so it shines without blooming
+    const ball = capDirectSpecular(
+      new THREE.MeshPhysicalMaterial({
+        color: "#a50f45",
+        roughness: 0.18,
+        clearcoat: 1,
+        clearcoatRoughness: 0.05,
+        envMap: env,
+        envMapIntensity: 0.8,
+      }),
+    );
     const cream = new THREE.MeshStandardMaterial({ color: "#f1e4cc", roughness: 0.45 });
     const belly = new THREE.MeshStandardMaterial({
       map: gfx.belly,
@@ -342,16 +345,18 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       emissiveIntensity: 0.5,
       roughness: 0.35,
     });
+    // the topper neon: its white tube core lands ~2x over the stage's bloom threshold (1.1, linear
+    // luminance), its painted spill well under it, so only the tube blooms
     const sign = new THREE.MeshBasicMaterial({
       map: gfx.sign,
-      color: new THREE.Color(COLORS.neon).multiplyScalar(3.2),
+      color: new THREE.Color(COLORS.neon).multiplyScalar(8.5),
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
     });
     const line = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ff6cc4").multiplyScalar(3.4),
+      color: new THREE.Color("#ff6cc4").multiplyScalar(5),
       toneMapped: false,
       transparent: true,
     });
@@ -505,8 +510,9 @@ export function Cabinet3D({ ref, quality, reducedMotion }: Props) {
       for (let i = 0; i < bulbs.length; i++) {
         const lit = winFlash ? i % 2 === 0 : (i + step) % 3 === 0;
         // the ring around the reel window stays dimmer than the arch, so its bloom never veils the symbols
-        const peak = i < N_TOP_BULBS ? 2.6 : 1.5;
-        const k = f.mode === "idle" ? (lit ? (i < N_TOP_BULBS ? 1.15 : 0.9) : 0.2) : lit ? peak : 0.16;
+        // (the arch's lit bulbs sit over the bloom threshold even at idle; the ring's stay under it)
+        const peak = i < N_TOP_BULBS ? 3.4 : 1.5;
+        const k = f.mode === "idle" ? (lit ? (i < N_TOP_BULBS ? 1.9 : 0.9) : 0.2) : lit ? peak : 0.16;
         color.setRGB(1.0 * k, 0.66 * k, 0.26 * k);
         m.setColorAt(i, color);
       }

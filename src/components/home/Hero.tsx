@@ -4,15 +4,17 @@ import { HeroPoster } from "./HeroPoster";
 import s from "./home.module.css";
 
 /**
- * Full-bleed hero. The 3D casino fills the box; on the low tier (and on first
- * paint, before the stage mounts) the static poster fills it instead. The
+ * Full-bleed hero. The poster (a still of the 3D stage's resting frame) is
+ * always painted first, in the server HTML; the live 3D casino mounts over it
+ * and fades in once it draws. On the low tier the poster is the hero. The
  * copy sits over both, bottom-left, out of the machine's way.
  */
 export function Hero() {
   return (
     <section className={s.hero} aria-labelledby="hero-title">
       <div className={s.stage}>
-        <CasinoLazy mode="hero" fallback={<HeroPoster />} className={s.stageCanvas} />
+        <HeroPoster />
+        <CasinoLazy mode="hero" fallback={null} className={s.stageCanvas} />
       </div>
       <div className={s.scrim} aria-hidden />
 
@@ -22,7 +24,7 @@ export function Hero() {
           let&rsquo;s go simping.
         </h1>
         <p className={s.heroLead}>
-          check in, post about the cult, bring alpha. it all pays in SIMP&nbsp;Points, and there&rsquo;s one machine in
+          Check in, post about the cult, bring alpha. It all pays in SIMP&nbsp;Points, and there&rsquo;s one machine in
           here that takes them.
         </p>
         <div className={s.heroActions}>

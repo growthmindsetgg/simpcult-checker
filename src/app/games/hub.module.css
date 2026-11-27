@@ -1,36 +1,27 @@
-/* The games hub: one lit machine, one reserved table. Casino printed matter. */
+/* The games hub: one lit table on a Monad-purple field, one reserved table on cream. */
 
 .hub {
-  /* palette, fonts and easing come from globals.css; only the local grain lives here */
-  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  --noise-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  --hairline: 0 0 0 1px var(--gold-lo), inset 0 0 0 1px rgb(246 220 149 / 0.2);
-
   width: 100%;
   max-width: 1120px;
   margin-inline: auto;
-  padding: 132px var(--gutter, 20px) 120px;
-  color: var(--paper);
+  padding: clamp(112px, 13vw, 148px) max(var(--gutter, 20px), env(safe-area-inset-right)) clamp(80px, 9vw, 120px)
+    max(var(--gutter, 20px), env(safe-area-inset-left));
+  color: var(--text);
 }
 
 .head {
-  max-width: 620px;
+  max-width: 640px;
 }
+/* size, weight and tracking come from .t-h1 (the one h1 token) */
 .title {
-  margin-top: 6px;
-  font-family: var(--display);
-  font-style: italic;
-  font-weight: 600;
-  font-size: clamp(56px, 9vw, 104px);
-  line-height: 0.92;
-  letter-spacing: -0.025em;
-  color: var(--paper);
+  color: var(--text);
 }
 .lead {
   margin-top: 18px;
-  font-size: 16px;
+  max-width: 48ch;
+  font-size: clamp(16px, 1.3vw, 18px);
   line-height: 1.55;
-  color: rgb(241 228 204 / 0.68);
+  color: var(--text-2);
   text-wrap: pretty;
 }
 
@@ -39,54 +30,57 @@
   grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
-  margin-top: 56px;
+  margin-top: clamp(40px, 5vw, 64px);
 }
 
-/* the lit machine */
+/* the lit table */
 .feature {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  border-radius: 3px;
+  border-radius: 10px;
   overflow: hidden;
-  background: var(--noise), linear-gradient(160deg, #3a0d2a, var(--velvet) 45%, #16050f);
+  background: linear-gradient(180deg, #3d2156 0%, #321a47 100%);
   box-shadow:
-    var(--hairline),
-    0 40px 90px -40px #000;
-  transition: box-shadow 0.3s var(--ease-out);
+    0 0 0 1px rgba(217, 168, 69, 0.4),
+    inset 0 1px 0 rgba(246, 220, 149, 0.18),
+    0 40px 80px -40px rgba(14, 9, 28, 0.8);
+  transition: box-shadow 0.25s var(--ease-out);
 }
+/* the art panel is a Monad-purple field with a lamp pool over the reel window */
 .featureArt {
   position: relative;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 22px;
-  padding: 40px 24px;
-  background: radial-gradient(ellipse 80% 70% at 50% 45%, rgb(255 63 174 / 0.12), transparent 70%);
+  padding: 44px 24px;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(255, 255, 255, 0.22), transparent 70%),
+    var(--monad);
 }
 .featureSign {
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--gold);
+  color: #ffffff;
 }
 .window {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 8px;
-  width: min(240px, 100%);
-  border-radius: 4px;
-  background: linear-gradient(150deg, var(--gold-hi), #b8862f 28%, var(--gold-lo) 52%, var(--gold) 78%, var(--gold-hi));
-  box-shadow: inset 0 1px 0 rgb(255 245 210 / 0.8), 0 3px 0 rgb(0 0 0 / 0.45);
+  width: min(250px, 100%);
+  border-radius: 6px;
+  background: linear-gradient(150deg, var(--gold-hi), #c8963a 28%, #8a6220 52%, var(--gold) 78%, var(--gold-hi));
+  box-shadow:
+    inset 0 1px 0 rgb(255 245 210 / 0.8),
+    0 3px 0 #2a1d7a,
+    0 18px 30px -14px rgba(20, 10, 70, 0.7);
 }
 .reel {
   display: grid;
   place-items: center;
   aspect-ratio: 3 / 4;
   border-radius: 2px;
-  background: linear-gradient(180deg, #a8967a, #f4ead6 30%, #fbf4e4 50%, #f4ead6 70%, #a8967a);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.4);
+  background: linear-gradient(180deg, #b9b2cf, #f7f5ff 30%, #ffffff 50%, #f7f5ff 70%, #b9b2cf);
+  box-shadow: inset 0 0 0 1px rgb(40 20 90 / 0.35);
 }
 .reel img {
   width: 80%;
@@ -98,24 +92,28 @@
   align-content: center;
   justify-items: start;
   gap: 12px;
-  padding: 36px 32px 36px 8px;
+  padding: 36px 32px;
+}
+.stakes {
+  color: var(--monad-text);
 }
 .name {
   font-family: var(--display);
-  font-weight: 650;
-  font-size: clamp(30px, 3.4vw, 42px);
+  font-variation-settings: "opsz" 24;
+  font-weight: 600;
+  font-size: clamp(30px, 3.2vw, 40px);
   line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--paper);
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 .tagline {
   font-size: 14.5px;
   line-height: 1.55;
-  color: rgb(241 228 204 / 0.7);
+  color: var(--text-2);
   text-wrap: pretty;
 }
 .seat {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .feature:focus-visible {
   outline: 2px solid var(--gold-hi);
@@ -125,83 +123,81 @@
   .feature:hover {
     box-shadow:
       0 0 0 1px var(--gold),
-      inset 0 0 0 1px rgb(246 220 149 / 0.3),
-      0 40px 90px -40px #000;
+      inset 0 1px 0 rgba(246, 220, 149, 0.28),
+      0 44px 90px -40px rgba(14, 9, 28, 0.9);
   }
 }
 
-/* reserved tables: pit slips */
+/* reserved tables: pit slips, cream stock, perforations punched with a mask */
 .slips {
   display: grid;
   gap: 22px;
-  padding-top: 18px;
+  padding-top: 14px;
 }
 .slip {
   position: relative;
-  padding: 22px 22px 20px;
-  background: var(--noise-paper), var(--paper);
+  isolation: isolate;
+  padding: 26px 24px 24px;
   color: var(--paper-ink);
-  transform: rotate(0.8deg);
-  box-shadow: 0 24px 50px -24px #000;
+  rotate: 0.8deg;
+  filter: drop-shadow(0 22px 26px rgba(14, 9, 28, 0.45));
 }
-.slip::before,
-.slip::after {
+/* the stock is its own layer, perforated top and bottom with a mask (a mask on .slip itself
+   would also cut away its drop shadow) */
+.slip::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 8px;
-  background: radial-gradient(circle at 7px 50%, var(--ink) 3.2px, transparent 3.8px) 0 0 / 14px 8px repeat-x;
-}
-.slip::before {
-  top: -4px;
-}
-.slip::after {
-  bottom: -4px;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(170deg, var(--paper-hi), var(--paper) 55%, var(--paper-2));
+  -webkit-mask:
+    radial-gradient(circle 3.4px at 7px 0, #0000 96%, #000) 0 0 / 14px 51% repeat-x,
+    radial-gradient(circle 3.4px at 7px 100%, #0000 96%, #000) 0 100% / 14px 51% repeat-x;
+  mask:
+    radial-gradient(circle 3.4px at 7px 0, #0000 96%, #000) 0 0 / 14px 51% repeat-x,
+    radial-gradient(circle 3.4px at 7px 100%, #0000 96%, #000) 0 100% / 14px 51% repeat-x;
 }
 .stamp {
   position: absolute;
-  top: 16px;
+  top: 18px;
   right: 16px;
   padding: 1px 8px 3px;
-  border: 1.5px solid #a3214f;
+  border: 1.5px solid var(--stamp);
   border-radius: 2px;
   font-family: var(--display);
   font-style: italic;
   font-size: 15px;
   font-weight: 700;
   line-height: 1.1;
-  color: #a3214f;
-  opacity: 0.85;
-  transform: rotate(-6deg);
+  color: var(--stamp);
+  opacity: 0.9;
+  rotate: -6deg;
 }
 .slipNo {
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 14px;
-  color: #7a5262;
+  color: var(--paper-ink-2);
 }
 .slipName {
-  margin-top: 6px;
+  margin-top: 8px;
   font-family: var(--display);
+  font-variation-settings: "opsz" 24;
   font-style: italic;
   font-weight: 600;
   font-size: 26px;
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 .slipText {
   margin-top: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
-  color: #563b49;
+  color: var(--paper-ink-2);
 }
 .house {
   padding: 0 4px;
-  font-family: var(--display);
-  font-style: italic;
-  font-size: 16px;
-  line-height: 1.45;
-  color: rgb(241 228 204 / 0.55);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-3);
+  text-wrap: pretty;
 }
 
 @media (max-width: 900px) {
@@ -210,16 +206,13 @@
   }
 }
 @media (max-width: 600px) {
-  .hub {
-    padding-top: 112px;
-  }
   .feature {
     grid-template-columns: 1fr;
   }
   .featureText {
-    padding: 4px 22px 28px;
+    padding: 26px 22px 30px;
   }
   .featureArt {
-    padding: 32px 20px 24px;
+    padding: 32px 20px 30px;
   }
 }

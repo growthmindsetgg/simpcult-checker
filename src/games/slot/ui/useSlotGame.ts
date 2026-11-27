@@ -51,9 +51,9 @@ type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; err: Sl
 
 // the machine's voice (research/lore/COPY-IDEAS.md): "aw dangit", never "keep going"
 const LINES = {
-  idle: "let's go simping.",
+  idle: "let’s go simping.",
   spinning: ["devotion in progress…", "the reels are simping…"],
-  loss: ["aw dangit.", "aw dangit. the reels didn't simp back.", "not this time. devotion is a long game.", "the machine is a tourist. you're not."],
+  loss: ["aw dangit.", "aw dangit. the reels didn’t simp back.", "not this time. devotion is a long game.", "the machine is a tourist. you’re not."],
   small: ["a little devotion, returned."],
   nice: ["the reels simped back.", "points for the faithful."],
   big: ["the machine bows to you."],
@@ -397,7 +397,7 @@ export function useSlotGame({
         setSay("out of points. the machine will wait. so will we.");
       } else {
         setSay(LINES.idle);
-        toast.bad("that spin didn't go through", r.err.error);
+        toast.bad("that spin didn’t go through", r.err.error);
       }
       busy.current = false;
       setSpinning(false);

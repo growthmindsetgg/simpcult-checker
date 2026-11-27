@@ -31,6 +31,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Quality } from "../contract";
+import { capDirectSpecular } from "@/games/slot/ui/three/materials";
 import { D } from "./dims";
 
 // ── materials (one shared set) ──────────────────────────────────────────────
@@ -116,8 +117,11 @@ let mats: ReturnType<typeof makeMaterials> | null = null;
 function makeMaterials() {
   return {
     // warm light-tan vinyl, satin rather than glossy so it reads as skin under coloured light
-    skin: vinyl("#e2b48f", { roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.4, sheen: 0.25, sheenColor: new Color("#ffdcc4") }),
-    skinShade: vinyl("#c99272", { roughness: 0.55, clearcoat: 0.25 }),
+    // the key spot's glint on the vinyl is capped under the bloom threshold, so his cheek shines without blooming
+    skin: capDirectSpecular(
+      vinyl("#e2b48f", { roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.4, sheen: 0.25, sheenColor: new Color("#ffdcc4") }),
+    ),
+    skinShade: capDirectSpecular(vinyl("#c99272", { roughness: 0.55, clearcoat: 0.25 })),
     stubble: new MeshPhysicalMaterial({ color: new Color("#c7a085"), roughness: 0.85 }),
     // near-black hair: a soft cool sheen on the crown and a satin coat, never a plastic shine
     hair: new MeshPhysicalMaterial({

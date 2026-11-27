@@ -5,10 +5,23 @@
  *   window.__casinoLab.step(seconds, fps = 30)  → advances every useFrame + renders
  *   window.__casinoLab.cells()                  → which reel cells Keone hides, in screen pixels
  *   window.__casinoLab.react(kind) / skip()     → drive the character / director by hand
+ *   window.__casinoLab.hdr()                    → linear (pre-bloom, pre-tone-map) luminance stats of the frame,
+ *                                                 split into emitters (toneMapped:false) and everything else,
+ *                                                 so the bloom threshold can sit above the brightest non-emitter
  */
 import { useThree } from "@react-three/fiber";
 import { useEffect, type RefObject } from "react";
-import { Box3, Raycaster, Vector3, type Object3D } from "three";
+import {
+  Box3,
+  FloatType,
+  Mesh,
+  NoToneMapping,
+  Raycaster,
+  Vector3,
+  WebGLRenderTarget,
+  type Material,
+  type Object3D,
+} from "three";
 import { ANCHORS, type CharacterHandle } from "../contract";
 import { setQuality } from "../quality";
 
@@ -22,7 +35,35 @@ type LabApi = {
   react(kind: Kind): void;
   skip(): void;
   exposure(v: number): void;
+  hdr(): unknown;
 };
+
+type LumStats = { max: number; p999: number; p99: number; p95: number; mean: number; n: number; over1: number; at: number[] };
+
+/** luminance percentiles of a float RGBA buffer, ignoring pixels at or below `floor` (background) */
+function lumStats(px: Float32Array, floor = -1, w = 1): LumStats {
+  const l: number[] = [];
+  let best = -1;
+  let bi = 0;
+  let over1 = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const y = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+    if (y > floor) l.push(y);
+    if (y > 1) over1++;
+    if (y > best) {
+      best = y;
+      bi = i / 4;
+    }
+  }
+  l.sort((a, b) => a - b);
+  const q = (f: number) => (l.length ? +l[Math.min(l.length - 1, Math.floor(f * l.length))].toFixed(3) : 0);
+  const mean = l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0;
+  // `at`: the brightest pixel, in CSS pixels from the top-left (the buffer is half size, bottom-up)
+  const at = w > 1 ? [(bi % w) * 2, (Math.floor(px.length / 4 / w) - 1 - Math.floor(bi / w)) * 2] : [];
+  return { max: q(1), p999: q(0.999), p99: q(0.99), p95: q(0.95), mean: +mean.toFixed(3), n: l.length, over1, at };
+}
+
+const isEmitter = (m: Material | Material[]) => (Array.isArray(m) ? m : [m]).some((x) => x.toneMapped === false);
 
 /** reel cell sample points (centre + four inset corners), world space; mirrors Cabinet3D's reel layout */
 const REEL_X = [-0.195, 0, 0.195];
@@ -51,11 +92,60 @@ export function LabHooks({
       exposure: (v) => {
         get().gl.toneMappingExposure = v;
       },
+      hdr() {
+        const { gl, scene, camera, size } = get();
+        const w = Math.round(size.width / 2);
+        const h = Math.round(size.height / 2);
+        const rt = new WebGLRenderTarget(w, h, { type: FloatType, samples: 0 });
+        const tm = gl.toneMapping;
+        gl.toneMapping = NoToneMapping;
+        const px = new Float32Array(w * h * 4);
+        const meshes: Mesh[] = [];
+        scene.traverse((o) => {
+          if ((o as Mesh).isMesh && o.visible) meshes.push(o as Mesh);
+        });
+        const shot = (show: (m: Mesh) => boolean) => {
+          const prev = meshes.map((m) => m.visible);
+          meshes.forEach((m) => (m.visible = show(m)));
+          gl.setRenderTarget(rt);
+          gl.clear();
+          gl.render(scene, camera);
+          gl.readRenderTargetPixels(rt, 0, 0, w, h, px);
+          gl.setRenderTarget(null);
+          meshes.forEach((m, i) => (m.visible = prev[i]));
+          return px.slice();
+        };
+        const all = shot(() => true);
+        const non = shot((m) => !isEmitter(m.material));
+        const emit = shot((m) => isEmitter(m.material));
+        gl.toneMapping = tm;
+        rt.dispose();
+        // emitter pixels: where the emitter-only pass is clearly above the background
+        const bg = lumStats(emit).p95;
+        return { all: lumStats(all, -1, w), nonEmitters: lumStats(non, -1, w), emitters: lumStats(emit, bg + 0.05, w) };
+      },
       info() {
         const s = get();
         const r = keoneRef.current?.root;
         const f = (p: { x: number; y: number; z: number }) => [p.x, p.y, p.z].map((n) => +n.toFixed(2));
-        return { t: +s.clock.elapsedTime.toFixed(2), cam: f(s.camera.position), keone: r ? f(r.position) : null, fov: (s.camera as { fov?: number }).fov };
+        return {
+          t: +s.clock.elapsedTime.toFixed(2),
+          cam: f(s.camera.position),
+          keone: r ? f(r.position) : null,
+          fov: (s.camera as { fov?: number }).fov,
+          programs: s.gl.info.programs?.length ?? 0,
+          roomEnv: (() => {
+            // materials tagged for the room environment, and how many have it bound explicitly
+            const seen = new Set<Material>();
+            s.scene.traverse((o) => {
+              const m = (o as Mesh).material;
+              for (const x of Array.isArray(m) ? m : m ? [m] : []) if (x.userData?.roomEnv) seen.add(x);
+            });
+            const env = s.scene.environment;
+            const bound = [...seen].filter((x) => env && (x as Material & { envMap?: unknown }).envMap === env).length;
+            return { tagged: seen.size, bound };
+          })(),
+        };
       },
       cells() {
         const s = get();

@@ -98,10 +98,10 @@ export function SlotGame() {
 
       <Hud game={game} stage={stageExpected} onOpen={setDrawer} />
 
-      <Sheet open={drawer === "paytable"} title="the pay card" onClose={() => setDrawer(null)}>
+      <Sheet open={drawer === "paytable"} title="The pay card" onClose={() => setDrawer(null)}>
         <Paytable art={game.art} bet={game.bet} />
       </Sheet>
-      <Sheet open={drawer === "fairness"} title="check every spin" onClose={() => setDrawer(null)}>
+      <Sheet open={drawer === "fairness"} title="Check every spin" onClose={() => setDrawer(null)}>
         <Fairness
           hash={game.hash}
           clientSeed={game.clientSeed}
@@ -116,8 +116,8 @@ export function SlotGame() {
       </Sheet>
 
       <p className={styles.credits}>
-        {game.credits.length > 0 && <>art: {game.credits.join(". ")}. </>}
-        fan-made. not affiliated with Monad or the Monad Foundation.
+        {game.credits.length > 0 && <>Art: {game.credits.join(". ")}. </>}
+        Fan-made. Not affiliated with Monad or the Monad Foundation.
       </p>
     </div>
   );
@@ -154,38 +154,38 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
         {/* left: the brass plaque once you're seated; until then the ticket that says why not stands in its place */}
         {signedOut ? (
           <Slip
-            stamp="members only"
-            title="take a seat, simp."
+            stamp="Members only"
+            title="Take a seat, simp."
             action={
               <Link href="/join" className="btn btn-primary btn-lg">
-                sign in
+                Sign in
               </Link>
             }
           >
-            prove your wallet to play. spins use the SIMP Points you earn in the <Link href="/portal">portal</Link>.
+            Prove your wallet to play. Spins use the SIMP Points you earn in the <Link href="/portal">portal</Link>.
           </Slip>
         ) : status === "error" ? (
           <Slip
-            stamp="back soon"
-            title="the machine is warming up."
+            stamp="Back soon"
+            title="The machine is warming up."
             action={
               <button type="button" className="btn btn-ghost btn-on-paper btn-sm" onClick={game.retry}>
-                try again
+                Try again
               </button>
             }
           >
-            the lights are on, the ledger isn&apos;t answering yet. give it a minute.
+            The lights are on, the ledger isn’t answering yet. Give it a minute.
           </Slip>
         ) : (
           <div className={styles.plaque}>
             <div className={styles.plaqueCell}>
-              <span className={`plate ${styles.engraved}`}>your points</span>
+              <span className={`t-caps ${styles.engraved}`}>Your points</span>
               <span className={styles.balance} data-testid="slot-balance">
                 {ready ? fmt(game.balance) : "—"}
               </span>
             </div>
             <div className={styles.plaqueCell} data-zero={game.lastWin === 0}>
-              <span className={`plate ${styles.engraved}`}>this spin</span>
+              <span className={`t-caps ${styles.engraved}`}>This spin</span>
               <span className={styles.thisSpin}>
                 <span id={game.winId} data-testid="slot-win">
                   0
@@ -232,7 +232,7 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
                 aria-disabled={spinning || !canSpin}
                 aria-keyshortcuts="Space"
               >
-                spin
+                Spin
               </button>
             </>
           )}
@@ -240,10 +240,10 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
 
         <div className={styles.side}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen("paytable")}>
-            pay card
+            Pay card
           </button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen("fairness")}>
-            fairness
+            Fairness
           </button>
           <button
             type="button"
@@ -260,23 +260,24 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
       <p className={styles.hint}>
         {intro ? (
           <>
-            the lights are coming up.{" "}
+            The lights are coming up.{" "}
+            {/* the slot's one skip control (the stage shows its own only on the home hero) */}
             {controls && (
               <button type="button" className={styles.textBtn} onClick={() => controls.skipIntro()}>
-                skip
+                Skip
               </button>
             )}
           </>
         ) : status === "loading" ? (
-          "opening the room…"
+          "Opening the room…"
         ) : ready && !canAfford ? (
           <>
-            not enough points for this spin. lower it, or earn more in the <Link href="/portal">portal</Link>.
+            Not enough points for this spin. Lower it, or earn more in the <Link href="/portal">portal</Link>.
           </>
         ) : ready ? (
-          <span data-howto>{stage ? "pull the lever, or press space" : "spin when ready. space works too."}</span>
+          <span data-howto>{stage ? "Pull the lever, or press Space." : "Spin when ready. Space works too."}</span>
         ) : signedOut || status === "error" ? null : (
-          "spins use SIMP Points only. every outcome is decided on the server, and you can check it."
+          "Spins use SIMP Points only. Every outcome is decided on the server, and you can check it."
         )}
       </p>
     </div>

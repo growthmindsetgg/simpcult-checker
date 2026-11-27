@@ -1,7 +1,13 @@
 "use client";
 /**
- * The camera director: the cinematic intro (INTRO_SHOTS), the resting PLAY /
- * HERO frames, and the hero-mode attract loop.
+ * The camera director: the short "house lights up" intro (INTRO_SHOTS), the
+ * resting PLAY / HERO frames, and the hero-mode attract loop.
+ *
+ * The intro is shot from the resting frame itself, with Keone already
+ * seated: the hero's first paint is a poster of exactly that frame, so the
+ * live canvas fades in over a picture it matches, then the sign flickers on
+ * and the house lights step up in under two seconds. No walk-in, no face
+ * shots: his face only turns to camera on a win.
  *
  * Lenses are chosen in millimetres on a 36 × 20.25 mm (16:9) gate and turned
  * into a vertical fov with fov = 2·atan(gateH / 2f).
@@ -11,19 +17,17 @@
  * window, the topper, Keone's head...) fits a screen rectangle that keeps
  * clear of the DOM (the slot HUD along the bottom, the home headline on the
  * left), then lens-shifts (camera.setViewOffset) the subject into that
- * rectangle. Intro shots are hand-placed and only widen on tall screens.
+ * rectangle.
  *
  * Every GSAP timeline here is created paused and advanced from useFrame, so
- * when the stage stops rendering (offscreen, hidden tab) the camera, the
- * character and the attract timer all freeze together. Character/cabinet
- * steps are gated on their promises, each raced against a frame-clock
- * timeout so an unfinished handle can never hang the intro.
+ * when the stage stops rendering (offscreen, hidden tab) the lights and the
+ * attract timer freeze together.
  */
 import { useFrame } from "@react-three/fiber";
 import gsap from "gsap";
 import { useEffect, useRef, type RefObject } from "react";
 import { PerspectiveCamera as Cam3, Vector3, type PerspectiveCamera } from "three";
-import { ANCHORS, casino, INTRO_SEEN_KEY, type CabinetHandle, type CharacterHandle, type Vec3 } from "../contract";
+import { ANCHORS, casino, INTRO_LENGTH, INTRO_SEEN_KEY, type CabinetHandle, type CharacterHandle, type Vec3 } from "../contract";
 import { evaluate, gridFromStops, type Grid } from "@/games/slot/engine";
 import { LINES, STRIP_LEN } from "@/games/slot/config";
 import type { StageFx } from "./fx";
@@ -48,34 +52,8 @@ function tallness(aspect: number) {
 
 // ── camera pose: a target plus an orbit (azimuth, horizontal radius, height) ──
 
-/**
- * sx / sy: lens shift in NDC (the target lands at (sx, sy) instead of the centre).
- * gate: 1 = a hand-placed shot that widens on tall screens; 0 = already solved for this aspect.
- */
-type Pose = { tx: number; ty: number; tz: number; az: number; r: number; y: number; fov: number; sx: number; sy: number; gate: number };
-type CamState = Pose & { follow: number };
-
-function poseFrom(pos: Vec3, target: Vec3, fov: number): Pose {
-  const dx = pos[0] - target[0];
-  const dz = pos[2] - target[2];
-  return { tx: target[0], ty: target[1], tz: target[2], az: Math.atan2(dx, dz), r: Math.hypot(dx, dz), y: pos[1], fov, sx: 0, sy: 0, gate: 1 };
-}
-
-/** the hand-placed intro shots */
-const POSE = {
-  /** behind the entrance, low, looking down the aisle at the dark machine */
-  open: poseFrom([1.85, 1.05, 12.45], [0.15, 2.45, -1.0], lens(34)),
-  openEnd: poseFrom([1.8, 0.98, 11.6], [0.15, 2.3, -1.0], lens(36)),
-  /** beside the lit machine, looking back up the aisle: he walks toward us, then sits in front-right profile */
-  side: poseFrom([2.6, 1.36, -0.4], [0.1, 1.28, 0.95], lens(35)),
-  /** over his right shoulder as he works the lever */
-  lever: poseFrom([2.35, 1.85, 2.75], [0.1, 1.3, 0.3], lens(42)),
-};
-
-/** the meet shot: a camera that backs down the aisle ahead of him, low and to his right (world offsets from his feet) */
-const MEET_EYE = new Vector3(0.85, 1.0, -3.1);
-const MEET_AIM_Y = 1.08;
-const MEET_FOV = lens(45);
+/** sx / sy: lens shift in NDC (the target lands at (sx, sy) instead of the centre) */
+type Pose = { tx: number; ty: number; tz: number; az: number; r: number; y: number; fov: number; sx: number; sy: number };
 
 // ── the resting frames ──────────────────────────────────────────────────────
 
@@ -236,7 +214,6 @@ function solveFrame(spec: FrameSpec, aspect: number): Pose {
     fov,
     sx: (rect[0] + rect[1]) / 2 - (b.x0 + b.x1) / 2,
     sy: (rect[2] + rect[3]) / 2 - (b.y0 + b.y1) / 2,
-    gate: 0,
   };
 }
 
@@ -257,12 +234,6 @@ function restPose(mode: StageMode, aspect: number) {
 export function randomGrid(): Grid {
   const r = () => Math.floor(Math.random() * STRIP_LEN);
   return gridFromStops([r(), r(), r()]);
-}
-
-function pathLength(p: readonly Vec3[]) {
-  let l = 0;
-  for (let i = 1; i < p.length; i++) l += Math.hypot(p[i][0] - p[i - 1][0], p[i][2] - p[i - 1][2]);
-  return l;
 }
 
 function markSeen() {
@@ -307,7 +278,7 @@ type Props = {
 };
 
 export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, apiRef, onIntroDone, onFreeze }: Props) {
-  const cam = useRef<CamState>({ ...POSE.open, follow: 0 });
+  const cam = useRef<Pose>(restPose(mode, 16 / 9));
   const running = useRef(new Map<gsap.core.Timeline, () => void>());
   const gen = useRef(0);
   const state = useRef({
@@ -322,17 +293,8 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     still: false,
     aspect: 16 / 9,
   });
-  const scratch = useRef({
-    eye: new Vector3(),
-    look: new Vector3(),
-    pos: new Vector3(),
-    tgt: new Vector3(),
-    rawPos: new Vector3(),
-    rawTgt: new Vector3(),
-    tmp: new Vector3(),
-    primed: false,
-    view: { w: 0, h: 0, sx: 0, sy: 0, fov: 0 },
-  });
+  const view = useRef({ w: 0, h: 0, sx: 0, sy: 0, fov: 0 });
+  const scratch = useRef({ pos: new Vector3(), tgt: new Vector3() });
   const cbs = useRef({ onIntroDone, onFreeze });
   useEffect(() => {
     cbs.current = { onIntroDone, onFreeze };
@@ -345,8 +307,6 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     const alive = () => g.current === my;
     const run = running.current;
     const st = state.current;
-    const c = cam.current;
-    const s = scratch.current;
 
     /** play a paused timeline on the frame clock */
     const play = (tl: gsap.core.Timeline) =>
@@ -354,20 +314,7 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
         tl.pause(0);
         run.set(tl, resolve);
       });
-    const sleep = (secs: number) => play(gsap.timeline({ paused: true }).to({}, { duration: secs }));
-    const within = <T,>(p: Promise<T> | undefined, secs: number) => Promise.race([p ?? Promise.resolve(), sleep(secs)]);
 
-    const setPose = (p: Pose) => Object.assign(c, p);
-    const tweenPose = (tl: gsap.core.Timeline, p: Pose, dur: number, at: number | string, ease = "power2.inOut") =>
-      tl.to(c, { ...p, duration: dur, ease }, at);
-
-    /** re-express the current camera as an orbit pose so the next move is a true arc */
-    const syncToCamera = (fov: number) => {
-      const { rawPos: a, rawTgt: b } = s;
-      Object.assign(c, poseFrom([a.x, a.y, a.z], [b.x, b.y, b.z], fov), { follow: 0 });
-    };
-
-    const rest = () => restPose(mode, st.aspect);
     const finalFrame = () => {
       for (const [tl, resolve] of run) {
         tl.kill();
@@ -375,10 +322,7 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
       }
       run.clear();
       Object.assign(fx, { sign: 1, sub: 1, key: 1, room: 1 });
-      setPose(rest());
-      c.follow = 0;
       keoneRef.current?.snap("seated");
-      cabinetRef.current?.show(randomGrid());
       markSeen();
       if (process.env.NODE_ENV !== "production" && st.clock > 0) console.info(`[casino] intro ran ${st.clock.toFixed(2)} s`);
       st.done = true;
@@ -390,7 +334,7 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     apiRef.current = {
       skip() {
         if (st.done) return;
-        g.current++; // aborts the async chain below
+        g.current++; // aborts the timeline below
         finalFrame();
       },
     };
@@ -401,7 +345,8 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     st.clock = 0;
     st.done = false;
 
-    // a full grid on the glass before anything moves
+    // the resting frame, Keone seated and a full grid on the glass, from the very first frame
+    keoneRef.current?.snap("seated");
     cabinetRef.current?.show(randomGrid());
 
     if (!lab.force && (reducedMotion || introSeen())) {
@@ -412,94 +357,28 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     }
 
     casino.setIntroDone(false);
-    Object.assign(fx, { sign: 0, sub: 0, key: 0, room: 0 });
-    setPose(POSE.open);
-    c.follow = 0;
-    keoneRef.current?.snap("offstage");
-
     /*
-     * The beats (≈10 s):
-     *  0.0  sign   black; the neon flickers on; a slow push down the aisle. He is already walking in.
-     *  1.4  meet   cut: a 45 mm camera backs down the aisle ahead of him; his face, lit by his fill. A glance to us.
-     *  3.9  arc    the camera swings round to beside the lit machine as he arrives, walking toward it
-     *  ~6   sit    he hops on and swivels a grin to camera
-     *  ~7.2 pull   over his right shoulder for the lever, the attract spin, then settle on the rest frame
+     * The beats (INTRO_LENGTH, 1.8 s), all on the resting frame:
+     *  0.0   the house at half light (never black: the poster under the canvas is the lit frame)
+     *  0.1   the "simp" tube stutters on; "MACHINE" follows at 0.7
+     *  0.95, 1.25, 1.55   the house lights come up in three steps, the key spot with them
      */
-    (async () => {
-      const aisle = ANCHORS.aisle;
-      const walkStart = 0.12;
-      const arrive = 5.95;
-      const speed = pathLength(aisle) / (arrive - walkStart);
-      let walk: Promise<void> | undefined;
-
-      // ── 1. sign ──
-      const sign = gsap.timeline({ paused: true });
-      tweenPose(sign, POSE.openEnd, 1.4, 0, "power1.inOut");
-      const flick = (key: "sign" | "sub", seq: [number, number][]) => seq.forEach(([t, v]) => sign.set(fx, { [key]: v }, t));
-      flick("sign", [[0.16, 0.55], [0.22, 0], [0.34, 0.85], [0.39, 0.08], [0.5, 1], [0.6, 0.3], [0.65, 1]]);
-      flick("sub", [[0.78, 0.7], [0.82, 0], [0.92, 1]]);
-      sign.to(fx, { key: 1, duration: 0.18, ease: "power3.out" }, 1.0);
-      sign.to(fx, { room: 1, duration: 0.7, ease: "power1.out" }, 1.0);
-      sign.call(() => {
-        walk = keoneRef.current?.walk(aisle, { speed });
-      }, undefined, walkStart);
-      await play(sign);
-      if (!alive()) return;
-
-      // ── 2. meet: hard cut to the camera ahead of him ──
-      s.primed = false; // the follow camera snaps instead of sliding through him
-      c.follow = 1;
-      c.fov = MEET_FOV;
-      const meet = gsap.timeline({ paused: true });
-      meet.to({}, { duration: 2.5 }, 0);
-      meet.call(() => keoneRef.current?.glance?.(0.55), undefined, 1.25);
-      await play(meet);
-      if (!alive()) return;
-
-      // ── 3. arc: round to beside the machine as he arrives ──
-      syncToCamera(c.fov);
-      const arc = gsap.timeline({ paused: true });
-      tweenPose(arc, POSE.side, 1.75, 0, "power2.inOut");
-      await play(arc);
-      if (!alive()) return;
-      await within(walk, 1.2);
-      if (!alive()) return;
-
-      // ── 4. sit, and a grin to camera as he lands ──
-      const sitP = keoneRef.current?.sit();
-      await within(sitP, 2.0);
-      if (!alive()) return;
-      // a short look (turn 0.42 + hold 0.25 + back 0.5): he is facing the lever again when the pull starts
-      keoneRef.current?.glance?.(0.25);
-      await sleep(1.1);
-      if (!alive()) return;
-
-      // ── 5. pull: over the shoulder, attract spin, settle on the rest frame ──
-      const k = keoneRef.current;
-      const cab = cabinetRef.current;
-      const pullP = Promise.all([k?.pullLever(), cab?.pullLever()]);
-      const pull = gsap.timeline({ paused: true });
-      tweenPose(pull, POSE.lever, 0.8, 0, "power2.inOut");
-      pull.call(() => cabinetRef.current?.startSpin(), undefined, 0.35);
-      const target = rest();
-      tweenPose(pull, target, mode === "hero" ? 1.5 : 1.1, 0.85, "power2.inOut");
-      const camP = play(pull);
-      await within(pullP, 1.4);
-      if (!alive()) return;
-      const grid = randomGrid();
-      await within(cabinetRef.current?.stop(grid, { staggerMs: 180, anticipationReel: null }), 3.0);
-      if (!alive()) return;
-      await camP;
-      if (!alive()) return;
-      finalFrame();
-    })().catch((err) => {
-      if (process.env.NODE_ENV !== "production") console.warn("[casino] intro aborted:", err);
+    Object.assign(fx, { sign: 0, sub: 0, key: 0.5, room: 0.55 });
+    const tl = gsap.timeline({ paused: true });
+    const flick = (key: "sign" | "sub", seq: [number, number][]) => seq.forEach(([t, v]) => tl.set(fx, { [key]: v }, t));
+    flick("sign", [[0.1, 0.6], [0.16, 0], [0.28, 0.9], [0.33, 0.1], [0.44, 1], [0.53, 0.35], [0.58, 1]]);
+    flick("sub", [[0.7, 0.7], [0.74, 0], [0.84, 1]]);
+    tl.to(fx, { room: 0.72, key: 0.68, duration: 0.12, ease: "power2.out" }, 0.95);
+    tl.to(fx, { room: 0.87, key: 0.85, duration: 0.12, ease: "power2.out" }, 1.25);
+    tl.to(fx, { room: 1, key: 1, duration: 0.2, ease: "power2.out" }, 1.55);
+    tl.to({}, { duration: INTRO_LENGTH }, 0);
+    void play(tl).then(() => {
       if (alive()) finalFrame();
     });
 
     return () => {
       g.current++;
-      for (const [tl] of run) tl.kill();
+      for (const [t] of run) t.kill();
       run.clear();
       if (apiRef.current) apiRef.current = null;
     };
@@ -522,12 +401,9 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
       ]);
       const mult = evaluate(grid, LINES).totalWin / LINES;
       const k = keoneRef.current;
-      if (mult >= 5) k?.react(mult >= 25 ? "big" : "nice"); // both turn to camera with the grin
-      else if (mult > 0) {
-        k?.react("small");
-        // now and then, a look to camera after the nod
-        if (st.attractCount % 2 === 1) setTimeout(() => k?.glance?.(0.8), 900);
-      } else if (st.attractCount % 3 === 0) setTimeout(() => k?.glance?.(0.6), 500);
+      // his face turns to camera only on a real win (the nice/big grin); small wins get the nod, losses nothing
+      if (mult >= 5) k?.react(mult >= 25 ? "big" : "nice");
+      else if (mult > 0) k?.react("small");
     } finally {
       st.attractBusy = false;
       st.attractIn = 6 + Math.random() * 2;
@@ -557,10 +433,9 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
         st.frozen = true; // fires once; the lab can still step frames by hand
         cbs.current.onFreeze();
       }
-    } else if (running.current.size === 0) {
-      // at rest: follow the solved frame (it re-solves on resize)
-      Object.assign(c, restPose(mode, st.aspect));
     }
+    // always the solved resting frame (it re-solves on resize)
+    Object.assign(c, restPose(mode, st.aspect));
 
     if (st.done && mode === "hero" && !st.still) {
       st.drift += dt;
@@ -578,42 +453,12 @@ export function Director({ mode, reducedMotion, fxRef, keoneRef, cabinetRef, api
     }
     s.pos.set(c.tx + Math.sin(az) * c.r, y, c.tz + Math.cos(az) * c.r);
     s.tgt.set(c.tx, c.ty, c.tz);
-
-    // the meet shot: a camera that backs down the aisle ahead of him, aimed at his face
-    const root = keoneRef.current?.root;
-    const tall = tallness(st.aspect);
-    if (root) {
-      const k = s.primed && c.follow > 0 ? 1 - Math.exp(-dt * 4) : 1;
-      s.tmp.copy(root.position).add(MEET_EYE);
-      s.tmp.x -= 0.5 * tall; // on a phone the camera sits nearly square-on so his face stays in the narrow frame
-      s.eye.lerp(s.tmp, k);
-      s.tmp.copy(root.position);
-      s.tmp.y = MEET_AIM_Y;
-      s.look.lerp(s.tmp, k);
-      s.primed = true;
-      if (c.follow > 0.0001) {
-        s.pos.lerp(s.eye, c.follow);
-        s.tgt.lerp(s.look, c.follow);
-      }
-    }
-    s.rawPos.copy(s.pos);
-    s.rawTgt.copy(s.tgt);
-
-    // hand-placed shots widen on tall screens (keep most of a 16:9 frame's width); solved frames already fit
-    let fov = c.fov;
-    const widen = Math.pow(Math.max(1, 1.5 / st.aspect), 0.78);
-    if (c.gate > 0.001 && widen > 1) {
-      const t = Math.tan((fov * Math.PI) / 360) * lerp(1, widen, c.gate);
-      fov = Math.min(78, (2 * Math.atan(t) * 180) / Math.PI);
-    }
     camera.position.copy(s.pos);
     camera.lookAt(s.tgt);
 
-    // lens shift: only touch the projection when something changed. Hand-placed shots on a tall
-    // screen lift their subject into the top half, clear of the home copy and the slot HUD.
-    const v = s.view;
-    const sx = c.sx;
-    const sy = c.sy + c.gate * tall * 0.36;
+    // lens shift: only touch the projection when something changed
+    const v = view.current;
+    const { sx, sy, fov } = c;
     if (v.w !== W || v.h !== H || Math.abs(v.sx - sx) > 1e-4 || Math.abs(v.sy - sy) > 1e-4 || Math.abs(v.fov - fov) > 1e-3) {
       Object.assign(v, { w: W, h: H, sx, sy, fov });
       camera.fov = fov;

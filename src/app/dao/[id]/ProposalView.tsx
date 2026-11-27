@@ -179,18 +179,18 @@ function VotePanel({
 
   return (
     <div className="glass p-6">
-      <h3 className="t-h3 mb-4 text-[15px]">your vote</h3>
+      <h3 className="t-h3 mb-4 text-[15px]">Your vote</h3>
 
       {!isConnected || !session ? (
         <>
-          <p className="mb-3 text-xs text-dim">connect and verify to vote.</p>
+          <p className="mb-3 text-xs text-dim">Connect and verify to vote.</p>
           <WalletButton className="w-full" />
         </>
       ) : !isHolder ? (
-        <p className="text-xs text-dim">this wallet holds no simp cult nft.</p>
+        <p className="text-xs text-dim">This wallet holds no Simp Cult NFT.</p>
       ) : state !== "active" ? (
         <p className="text-xs text-dim">
-          voting is {state === "pending" ? "not open yet" : "closed"}.
+          Voting is {state === "pending" ? "not open yet" : "closed"}.
           {myChoice !== null && (
             <> you voted <b className="text-text">{["against", "for", "abstain"][myChoice]}</b>.</>
           )}
@@ -198,7 +198,7 @@ function VotePanel({
       ) : (
         <>
           <div className="mb-3 text-xs text-dim">
-            you hold <b className="text-text">{tokens.data?.length ?? "…"}</b> nft
+            You hold <b className="text-text">{tokens.data?.length ?? "…"}</b> NFT
             {(tokens.data?.length ?? 0) === 1 ? "" : "s"}
             {tokens.data && free.length !== tokens.data.length && (
               <> · {tokens.data.length - free.length} already voted</>
@@ -236,24 +236,24 @@ function VotePanel({
             })}
           </div>
           {free.length === 0 && tokens.data && tokens.data.length > 0 && (
-            <p className="mt-3 text-xs text-ok">all your nfts have voted on this proposal.</p>
+            <p className="mt-3 text-xs text-ok">All your NFTs have voted on this proposal.</p>
           )}
           <p className="mt-3 text-[11px] text-mute">
-            one transaction to <span className="mono">{short(DAO_ADDRESS)}</span> · castVote({id}, choice, your tokenIds). no approvals.
+            One transaction to <span className="mono">{short(DAO_ADDRESS)}</span>: castVote({id}, choice, your NFT ids). No approvals.
           </p>
         </>
       )}
 
       {pendingHash && (
         <a className="link mt-3 block text-xs" href={explorerTx(pendingHash)} target="_blank" rel="noreferrer">
-          view transaction
+          View transaction
         </a>
       )}
       {err && <p className="mt-3 text-xs text-bad">{err}</p>}
 
       {address && address.toLowerCase() === proposer.toLowerCase() && (state === "active" || state === "pending") && (
         <button className="btn btn-danger mt-4 w-full" onClick={cancel} disabled={busy !== null}>
-          {busy === "cancel" ? <Icon name="spinner" /> : "cancel proposal"}
+          {busy === "cancel" ? <Icon name="spinner" /> : "Cancel proposal"}
         </button>
       )}
     </div>

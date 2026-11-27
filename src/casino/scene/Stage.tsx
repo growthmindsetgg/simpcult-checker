@@ -3,10 +3,16 @@
  * CasinoStage: the velvet room, the lit Simp Machine, Keone, and the intro.
  *
  * Tiers (see contract Quality):
- *   high  shadows (one spot), reflector floor, bloom + ACES + vignette + grain + SMAA, DPR ≤ 2
- *   mid   no shadows, glossy clearcoat floor, bloom + ACES only, CSS vignette, DPR ≤ 1.5
+ *   high  shadows (one spot), reflector floor, bloom + PBR Neutral + vignette + grain,
+ *         4x MSAA below DPR 2 (SMAA at 2), DPR ≤ 2
+ *   mid   no shadows, satin clearcoat floor, bloom + PBR Neutral + SMAA, CSS vignette, DPR ≤ 1.5
  * drei PerformanceMonitor steps high → mid at runtime (never when ?quality= is forced).
  * Rendering pauses whenever the stage is offscreen or the tab is hidden.
+ *
+ * Hero mode is transparent until its first frame: the home page paints a poster of the resting
+ * frame underneath (HeroPoster), and the canvas fades in over it. Play mode lifts a plum curtain.
+ * Only the hero shows a "skip intro" control (the slot HUD has its own), and it goes once the
+ * intro ends or the page scrolls past 30% of the viewport.
  */
 import { PerformanceMonitor } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
@@ -31,10 +37,10 @@ export type StageMode = "hero" | "play";
 export type StageProps = { mode: StageMode; quality: Exclude<Quality, "low">; reducedMotion: boolean; className?: string };
 
 /**
- * Exposure per tier. Mid has no shadows, no grain and a CSS vignette in place
- * of the post one, so it reads brighter at the same exposure.
+ * Exposure per tier (PBR Neutral tone mapping). Mid has no shadows, no grain and a CSS vignette in
+ * place of the post one, so it reads brighter at the same exposure.
  */
-const EXPOSURE: Record<Exclude<Quality, "low">, number> = { high: 1.02, mid: 0.95 };
+const EXPOSURE: Record<Exclude<Quality, "low">, number> = { high: 1.2, mid: 1.15 };
 
 function Exposure({ value }: { value: number }) {
   const get = useThree((s) => s.get);
@@ -64,6 +70,7 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
   const [frozen, setFrozen] = useState(false);
   const [ready, setReady] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+  const [scrolledPast, setScrolledPast] = useState(false);
   const mountedAt = useRef(0);
 
   // pause rendering offscreen / hidden tab
@@ -111,11 +118,21 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
     };
   }, []);
 
+  // the hero's skip control goes once the visitor scrolls on past the intro
+  useEffect(() => {
+    if (mode !== "hero" || introDone) return;
+    const onScroll = () => setScrolledPast(window.scrollY > window.innerHeight * 0.3);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [mode, introDone]);
+
   // Escape skips the intro too
   useEffect(() => {
     if (introDone) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") director.current?.skip();
+      // with the mobile menu up, Escape belongs to the menu (Nav sets html[data-menu])
+      if (e.key === "Escape" && document.documentElement.dataset.menu !== "open") director.current?.skip();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -135,7 +152,7 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
   const [forced] = useState(isQualityForced);
 
   return (
-    <div ref={wrap} className={`${styles.stage} ${className ?? ""}`}>
+    <div ref={wrap} className={`${styles.stage} ${className ?? ""}`} data-mode={mode} data-ready={ready || undefined}>
       <Canvas
         className={styles.canvas}
         shadows={shadowMap ? "percentage" : false}
@@ -148,8 +165,8 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
         camera={{ fov: 30, near: 0.1, far: 40, position: [1.85, 1.05, 12.45] }}
         aria-hidden
       >
-        <color attach="background" args={[C.ink]} />
-        <fogExp2 attach="fog" args={[C.ink, FOG_DENSITY]} />
+        <color attach="background" args={[C.plum]} />
+        <fogExp2 attach="fog" args={[C.fog, FOG_DENSITY]} />
         {high && !forced && <PerformanceMonitor onDecline={stepDown} onFallback={stepDown} flipflops={3} />}
         <Suspense fallback={null}>
           <Lights fxRef={fxRef} shadows={high} />
@@ -175,10 +192,12 @@ export default function CasinoStage({ mode, quality, reducedMotion, className }:
         {process.env.NODE_ENV !== "production" && <LabHooks freeze={onFreeze} skip={skip} keoneRef={keone} />}
       </Canvas>
       {!high && <div className={styles.vignette} aria-hidden />}
-      <div className={`${styles.curtain} ${ready ? styles.curtainUp : ""}`} aria-hidden />
-      {/* portalled to <body>: the page's copy and the slot HUD stack above the stage's own context */}
-      {ready &&
+      {mode === "play" && <div className={`${styles.curtain} ${ready ? styles.curtainUp : ""}`} aria-hidden />}
+      {/* hero only (the slot HUD carries its own skip). Portalled to <body>: the page's copy stacks above the stage */}
+      {mode === "hero" &&
+        ready &&
         !introDone &&
+        !scrolledPast &&
         visible &&
         createPortal(
           <button type="button" className={styles.skip} data-mode={mode} onClick={skip}>

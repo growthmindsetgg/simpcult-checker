@@ -14,10 +14,10 @@ function subscribeScroll(cb: () => void) {
 }
 
 export const NAV_ITEMS = [
-  { href: "/games/slot", match: "/games", label: "machine", note: "spin your points" },
-  { href: "/portal", match: "/portal", label: "earn", note: "check in, post, bring alpha" },
-  { href: "/dao", match: "/dao", label: "dao", note: "one nft, one vote" },
-  { href: "/join", match: "/join", label: "join", note: "the holders' chat" },
+  { href: "/games/slot", match: "/games", label: "Machine", note: "Spin your points" },
+  { href: "/portal", match: "/portal", label: "Earn", note: "Check in, post, bring alpha" },
+  { href: "/dao", match: "/dao", label: "DAO", note: "One NFT, one vote" },
+  { href: "/join", match: "/join", label: "Join", note: "The holders’ chat" },
 ];
 
 const isActive = (path: string, match: string) => path === match || path.startsWith(`${match}/`);
@@ -25,7 +25,7 @@ const isActive = (path: string, match: string) => path === match || path.startsW
 export function Nav() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const scrolled = useSyncExternalStore(subscribeScroll, () => window.scrollY > 12, () => false);
+  const scrolled = useSyncExternalStore(subscribeScroll, () => window.scrollY > 8, () => false);
   const firstLink = useRef<HTMLAnchorElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
 
@@ -39,21 +39,25 @@ export function Nav() {
   // menu open: lock scroll, Escape closes, focus moves in and back out
   useEffect(() => {
     if (!open) return;
-    const prev = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
+    const root = document.documentElement;
+    const prev = root.style.overflow;
+    root.style.overflow = "hidden";
+    // page-level floating controls (the hero's "skip intro") hide while the menu is up
+    root.dataset.menu = "open";
     firstLink.current?.focus({ preventScroll: true });
     const btn = toggle.current;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
     return () => {
-      document.documentElement.style.overflow = prev;
+      root.style.overflow = prev;
+      delete root.dataset.menu;
       window.removeEventListener("keydown", onKey);
       btn?.focus({ preventScroll: true });
     };
   }, [open]);
 
-  // see-through only over the home hero, before the first scroll
-  const clear = path === "/" && !scrolled && !open;
+  // clear at the very top of every page; glass once the page moves (scrollY > 8)
+  const clear = !scrolled && !open;
 
   return (
     <header className={s.nav} data-clear={clear} data-open={open}>
@@ -88,8 +92,8 @@ export function Nav() {
           aria-controls="site-menu"
         >
           <span aria-hidden className={s.toggleLabel} data-state={open ? "close" : "menu"}>
-            <span>menu</span>
-            <span>close</span>
+            <span>Menu</span>
+            <span>Close</span>
           </span>
           <span className="sr-only">{open ? "close menu" : "open menu"}</span>
         </button>
@@ -98,7 +102,7 @@ export function Nav() {
       {/* the mobile menu: a drinks card, not a drawer */}
       <div id="site-menu" className={s.menu} data-open={open} inert={!open}>
         <div className={s.menuCard}>
-          <p className={s.menuKicker}>served all night</p>
+          <p className={s.menuKicker}>Served all night</p>
           <ul className={s.menuList}>
             {NAV_ITEMS.map((i, n) => (
               <li key={i.href} style={{ "--i": n } as React.CSSProperties}>
@@ -120,7 +124,7 @@ export function Nav() {
           </div>
           <p className={s.menuSmall}>
             <a href={LINKS.x} target="_blank" rel="noreferrer" className="link">@monadsimpcult</a>
-            <a href={LINKS.opensea} target="_blank" rel="noreferrer" className="link">the collection</a>
+            <a href={LINKS.opensea} target="_blank" rel="noreferrer" className="link">The collection</a>
           </p>
         </div>
       </div>

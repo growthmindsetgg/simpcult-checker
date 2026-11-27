@@ -7,7 +7,8 @@ import { useMounted } from "@/lib/useMounted";
 
 export { motion, AnimatePresence };
 
-const EASE = [0.23, 1, 0.32, 1] as const;
+const EASE = [0.23, 1, 0.32, 1] as const; // UI: modals, list items
+const REVEAL = [0.19, 1, 0.22, 1] as const; // expo-out: scroll reveals only (--ease-reveal)
 
 /* ── scroll reveal (used sparingly: one reveal per section at most) ── */
 export function Reveal({
@@ -33,7 +34,7 @@ export function Reveal({
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once, margin: "0px 0px -8% 0px" }}
-      transition={{ duration: 0.5, ease: EASE, delay }}
+      transition={{ duration: 0.8, ease: REVEAL, delay }}
     >
       {children}
     </Tag>
@@ -102,7 +103,7 @@ export function ModalShell({ open, onClose, children, className = "max-w-md" }: 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-[rgba(6,2,8,0.78)] p-4"
+          className="fixed inset-0 z-50 grid place-items-center overscroll-contain bg-[rgba(14,9,28,0.72)] p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.15 } }}

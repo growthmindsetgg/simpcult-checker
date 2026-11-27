@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWriteContract, usePublicClient } from "wagmi";
+import { useAccount, useWriteContract, usePublicClient } from "wagmi";
 import { decodeEventLog } from "viem";
 import { dao, useDaoConfig } from "@/lib/dao";
 import { DAO_ADDRESS, short } from "@/lib/config";
@@ -16,14 +16,16 @@ export function NewProposal({ open, onClose }: { open: boolean; onClose: () => v
   const [err, setErr] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "wallet" | "mining">("idle");
   const { writeContractAsync } = useWriteContract();
+  const { isConnected } = useAccount();
   const client = usePublicClient();
   const cfg = useDaoConfig();
   const router = useRouter();
 
   async function submit() {
     setErr(null);
-    if (!title.trim() || title.length > 120) return setErr("title: 1–120 characters");
-    if (desc.length > 4000) return setErr("description: max 4000 characters");
+    if (!isConnected) return setErr("Connect your wallet to send the proposal.");
+    if (!title.trim() || title.length > 120) return setErr("Title: 1–120 characters.");
+    if (desc.length > 4000) return setErr("Description: 4,000 characters at most.");
     try {
       setStage("wallet");
       const hash = await writeContractAsync({ ...dao, functionName: "propose", args: [title.trim(), desc.trim()] });
@@ -50,23 +52,23 @@ export function NewProposal({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <ModalShell open={open} onClose={onClose} className="max-w-lg">
-        <h2 className="t-h2 text-[24px]">new proposal</h2>
+        <h2 className="t-h2 text-[24px]">New proposal</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-dim">
-          this sends one transaction to <span className="mono">{short(DAO_ADDRESS)}</span> (propose). voting opens{" "}
+          This sends one transaction to <span className="mono">{short(DAO_ADDRESS)}</span> (propose). Voting opens{" "}
           {cfg.data?.delay ? `after ${Math.round(cfg.data.delay / 60)} min` : "immediately"} and runs{" "}
           {cfg.data ? `${Math.round(cfg.data.period / 3600)}h` : "…"}.
         </p>
         <div className="mt-6 space-y-3">
-          <input className="input" name="title" aria-label="proposal title" autoComplete="off" placeholder="title (max 120)…" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
-          <textarea className="input min-h-36 resize-y" name="description" aria-label="proposal description" placeholder="what are we deciding? be specific: what, why, cost, who executes." value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={4000} />
+          <input className="input" name="title" aria-label="proposal title" autoComplete="off" placeholder="Title (120 characters max)…" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
+          <textarea className="input min-h-36 resize-y" name="description" aria-label="proposal description" placeholder="What are we deciding? Be specific: what, why, cost, who executes." value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={4000} />
           <div className="text-right text-[11px] text-mute">{desc.length}/4000</div>
         </div>
         {err && <p className="mt-2 text-xs text-bad">{err}</p>}
         <div className="mt-5 flex gap-2.5">
-          <button className="btn btn-primary flex-1" onClick={submit} disabled={stage !== "idle"}>
-            {stage === "idle" ? "submit on-chain" : stage === "wallet" ? <><Icon name="spinner" /> confirm in wallet</> : <><Icon name="spinner" /> mining…</>}
+          <button className="btn btn-primary flex-1" onClick={submit} disabled={stage !== "idle" || !isConnected}>
+            {stage === "idle" ? "Submit on-chain" : stage === "wallet" ? <><Icon name="spinner" /> Confirm in wallet</> : <><Icon name="spinner" /> Mining…</>}
           </button>
-          <button className="btn btn-ghost" onClick={onClose} disabled={stage === "mining"}>cancel</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={stage === "mining"}>Cancel</button>
         </div>
     </ModalShell>
   );

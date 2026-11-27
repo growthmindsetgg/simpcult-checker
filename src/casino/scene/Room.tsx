@@ -13,7 +13,6 @@ import {
   BoxGeometry,
   Color,
   CylinderGeometry,
-
   InstancedMesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
@@ -22,6 +21,8 @@ import {
   type Texture,
 } from "three";
 import type { Quality } from "../contract";
+import { capDirectSpecular } from "@/games/slot/ui/three/materials";
+import { brassMaterial, usesRoomEnv } from "./brass";
 import { C } from "./palette";
 import { tuftedNormalMap } from "./textures";
 
@@ -34,20 +35,25 @@ const D = ROOM.z1 - ROOM.z0;
 type Mats = ReturnType<typeof makeMaterials>;
 
 function makeMaterials() {
+  // wine velvet, a step lighter and a touch more violet than the 3am room: under the house lights it reads as cloth
   const velvet = new MeshPhysicalMaterial({
-    color: C.velvet,
+    color: "#3a1035",
     roughness: 0.82,
     sheen: 1,
-    sheenColor: new Color(C.velvetHi),
-    sheenRoughness: 0.45,
+    sheenColor: new Color("#7a2c66"),
+    sheenRoughness: 0.42,
   });
-  const brass = new MeshStandardMaterial({ color: C.gold, metalness: 1, roughness: 0.3 });
-  const brassDim = new MeshStandardMaterial({ color: C.goldLo, metalness: 1, roughness: 0.38 });
-  const lacquer = new MeshStandardMaterial({ color: "#110a12", metalness: 0.35, roughness: 0.28 });
-  const ceiling = new MeshStandardMaterial({ color: "#07040a", roughness: 1 });
+  // polished brass (rails, rods, frames); the dim one is the older, tarnished brass on shelves and ghost machines
+  const brass = brassMaterial(0.16);
+  const brassDim = brassMaterial(0.24, 0.55);
+  // black-plum gloss lacquer on the props (bar, banquette plinth, tables, ghost machines). A plain glossy
+  // standard material, capped like the brass: it shares the brass's shader programs (each lit program
+  // here costs 0.6-1.6 s to compile on an integrated GPU), and the hero machine keeps the clear coat
+  const lacquer = usesRoomEnv(capDirectSpecular(new MeshStandardMaterial({ color: "#1e0f22", metalness: 0, roughness: 0.2 })));
+  const ceiling = new MeshStandardMaterial({ color: "#2a1838", roughness: 1 });
   const glassWarm = new MeshStandardMaterial({
     color: "#2a1608",
-    emissive: new Color("#ffb46a"),
+    emissive: new Color(C.amber),
     emissiveIntensity: 1.6,
     roughness: 0.6,
   });
@@ -58,7 +64,7 @@ function makeMaterials() {
     roughness: 0.2,
     metalness: 0.2,
   });
-  const amber = new MeshStandardMaterial({ color: "#1a0e05", emissive: new Color("#ff9a4a"), emissiveIntensity: 0.55 });
+  const amber = new MeshStandardMaterial({ color: "#1a0e05", emissive: new Color(C.amber), emissiveIntensity: 0.7 });
   // the doorway glow: dim enough to read as a warm corridor beyond, not a lit panel
   const beyond = new MeshStandardMaterial({ color: "#000", emissive: new Color("#9a4a2c"), emissiveIntensity: 0.12 });
   return { velvet, brass, brassDim, lacquer, ceiling, glassWarm, screenDim, beyond, amber };
@@ -90,12 +96,13 @@ function Floor({ quality }: { quality: Exclude<Quality, "low"> }) {
           mixContrast={1}
           mirror={0}
           depthScale={0}
-          color="#120a14"
+          color="#21122a"
           metalness={0.6}
-          roughness={0.55}
+          roughness={0.5}
         />
       ) : (
-        <meshPhysicalMaterial color="#0c070f" metalness={0.4} roughness={0.32} clearcoat={1} clearcoatRoughness={0.06} />
+        // a satin coat, not a mirror: at a mirror finish every point light became a hard bright dot on the floor
+        <meshPhysicalMaterial color="#1a0d22" metalness={0.4} roughness={0.32} clearcoat={1} clearcoatRoughness={0.16} />
       )}
     </mesh>
   );

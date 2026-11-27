@@ -25,10 +25,12 @@ const CARDS: Card[] = [
   { size: [6, 2.6], at: [0.4, 1.3, 5.2], rgb: [0.42, 0.32, 0.26] },
   // the topper neon as a thin strip behind and above (kept low: it shows in the bezel's bottom lip, right under the reels)
   { size: [2.8, 0.14], at: [0, 3.0, -2.8], rgb: [1.5, 0.2, 0.8] },
-  // Monad-purple side wash, left
-  { size: [1.6, 3.6], at: [-4.6, 1.8, 0.4], rgb: [0.24, 0.18, 0.72] },
-  // a cool narrow kicker, right, so cylinder edges catch a line
-  { size: [0.5, 2.8], at: [3.6, 1.7, 2.2], rgb: [0.62, 0.66, 0.82] },
+  // Monad-purple side wash, left (#6E54FF)
+  { size: [1.6, 3.6], at: [-4.6, 1.8, 0.4], rgb: [0.31, 0.19, 1.0] },
+  // a narrow Monad-cyan kicker (#85E6FF), right, so cylinder edges catch a cool line
+  { size: [0.5, 2.8], at: [3.6, 1.7, 2.2], rgb: [0.42, 0.78, 1.0] },
+  // a lavender overhead card (#DDD7FE) behind the key, so top faces read lit from the house lights
+  { size: [3.0, 1.6], at: [-1.2, 4.8, -0.6], rgb: [0.72, 0.68, 0.98] },
   // the floor's faint bounce
   { size: [10, 10], at: [0, -3.2, 0], rgb: [0.05, 0.025, 0.035] },
 ];
@@ -60,11 +62,12 @@ export function buildCabinetEnv(gl: THREE.WebGLRenderer): THREE.Texture {
 }
 
 /**
- * Cap the direct (punctual-light) specular, clearcoat included, just under
- * the bloom threshold (0.9). The stage's key spot is very bright; on a
+ * Cap the direct (punctual-light) specular, clearcoat included, under the
+ * stage's bloom threshold (1.1, linear). The key spot is very bright; on a
  * polished bevel or lacquer facing it, its glint would sit far above the
- * threshold and haze the reel window it frames. Environment reflections (the
- * cards) are untouched, so brass and lacquer keep their structure.
+ * threshold and haze the reel window it frames. The base and clear-coat
+ * lobes share one cap (they add up in the output). Environment reflections
+ * (the cards) are untouched, so brass and lacquer keep their structure.
  */
 export function capDirectSpecular<M extends THREE.MeshStandardMaterial>(m: M, cap = 0.8): M {
   const c = cap.toFixed(2);
@@ -74,11 +77,11 @@ export function capDirectSpecular<M extends THREE.MeshStandardMaterial>(m: M, ca
       `#include <lights_fragment_end>
       reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${c}));
       #ifdef USE_CLEARCOAT
-        clearcoatSpecularDirect = min(clearcoatSpecularDirect, vec3(${c}));
+        clearcoatSpecularDirect = min(clearcoatSpecularDirect, max(vec3(${c}) - reflectedLight.directSpecular, vec3(0.0)));
       #endif`,
     );
   };
-  m.customProgramCacheKey = () => `cap-spec-${cap}`;
+  m.customProgramCacheKey = () => `cap-spec-sum-${cap}`;
   return m;
 }
 

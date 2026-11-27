@@ -1,0 +1,29 @@
+/*
+ * The hero poster: a still of the composed 3D frame (the stage's own render,
+ * captured at the rest pose), painted in the server HTML so the first paint is
+ * the room, not a black box. The live canvas fades in over it once it draws.
+ * On the low tier (no WebGL, Save-Data) it is the whole hero.
+ */
+.poster {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #29133a;
+  pointer-events: none;
+}
+
+.poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* landscape: the machine, Keone and the sign sit in the right half of the frame */
+  object-position: 72% 50%;
+}
+
+/* portrait screens get the portrait still: the subject sits in the top half, above the copy */
+@media (max-aspect-ratio: 1/1) {
+  .poster img {
+    object-position: 50% 30%;
+  }
+}

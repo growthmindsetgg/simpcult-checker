@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary", site: "@monadsimpcult" },
 };
 
-export const viewport: Viewport = { themeColor: "#0a0610", colorScheme: "dark", viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#29133A", colorScheme: "dark", viewportFit: "cover" };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const cookie = (await headers()).get("cookie");
