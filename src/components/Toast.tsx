@@ -83,13 +83,13 @@ export function Toaster() {
             className="toast"
             data-tone={t.tone}
             role="status"
-            initial={{ opacity: 0, y: 16, rotate: -1.5 }}
+            initial={{ opacity: 0, y: 12, rotate: -1.2 }}
             animate={{ opacity: 1, y: 0, rotate: 0 }}
             exit={{ opacity: 0, y: 10, transition: { duration: 0.16 } }}
-            transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
+            transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
           >
             <span className="toast-icon" aria-hidden>
-              <Icon name={TONE_ICON[t.tone]} className="h-3.5 w-3.5" />
+              <Icon name={TONE_ICON[t.tone]} className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="toast-title">{t.title}</div>

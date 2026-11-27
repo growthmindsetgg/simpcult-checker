@@ -1,6 +1,6 @@
 import { createConfig, http, cookieStorage, createStorage } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
-import { CHAIN, RPC_URL } from "./config";
+import { CHAIN, RPC_URL, SITE } from "./config";
 
 /**
  * Wallet config — security posture:
@@ -26,8 +26,8 @@ export const wagmiConfig = createConfig({
             metadata: {
               name: "simp cult",
               description: "simp cult — monad nft collection & dao",
-              url: "https://simpcult.xyz",
-              icons: ["https://simpcult.xyz/favicon.ico"],
+              url: SITE.url,
+              icons: [`${SITE.url}/apple-icon`],
             },
           }),
         ]

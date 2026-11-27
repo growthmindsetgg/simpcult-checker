@@ -48,7 +48,7 @@ export function Fairness({ hash, clientSeed, seedValid, onSeedChange, onNewSeed,
             autoComplete="off"
             disabled={disabled}
           />
-          <button type="button" className={styles.brassBtn} onClick={onNewSeed} disabled={disabled}>
+          <button type="button" className="btn btn-ghost" onClick={onNewSeed} disabled={disabled}>
             new seed
           </button>
         </div>

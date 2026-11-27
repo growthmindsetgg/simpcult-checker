@@ -6,7 +6,6 @@ import { useAccount } from "wagmi";
 import { short } from "@/lib/config";
 import { useSession } from "@/lib/useSession";
 import { WalletModal } from "./WalletModal";
-import { Icon } from "../Icon";
 
 /**
  * `variant="quiet"` keeps the button brass even before connecting, so it never
@@ -25,7 +24,7 @@ export function WalletButton({ className = "", variant = "primary" }: { classNam
     <>
       <button className={`btn ${isConnected || variant === "quiet" ? "btn-ghost" : "btn-primary"} ${className}`} onClick={() => setOpen(true)}>
         {mounted && isConnected && <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />}
-        {mounted && isConnected ? <span className="mono">{label}</span> : (<><Icon name="wallet" className="h-4 w-4" /> {label}</>)}
+        {mounted && isConnected ? <span className="mono">{label}</span> : label}
       </button>
       <WalletModal open={open} onClose={() => setOpen(false)} />
     </>

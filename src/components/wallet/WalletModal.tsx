@@ -28,10 +28,15 @@ function Body({ onClose }: { onClose: () => void }) {
       <StepIndicator step={step} />
       {step === 1 && (!isConnected || !address ? <Connect /> : <WrongChain />)}
       {step >= 2 && address && (
-        <Verify address={address} connectorName={connector?.name} onClose={onClose} />
+        <Verify address={address} connectorName={connector ? connectorLabel(connector.id, connector.name) : undefined} onClose={onClose} />
       )}
     </>
   );
+}
+
+/* "Injected" is wagmi's word, not a person's: name it for what it is */
+function connectorLabel(id: string, name: string) {
+  return id === "injected" ? "browser wallet" : name.toLowerCase();
 }
 
 /* ── indicator: connect → verify → done ─────────────────────── */
@@ -97,17 +102,17 @@ function Connect() {
               }
             }}
             className="glass glass-hover flex w-full items-center gap-3 px-4 py-3.5 text-left"
-            aria-label={`connect with ${c.name}`}
+            aria-label={`connect with ${connectorLabel(c.id, c.name)}`}
           >
             {c.icon ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={c.icon} alt="" className="h-7 w-7 rounded-md" />
             ) : (
-              <span className="grid h-7 w-7 place-items-center rounded-md bg-gold/15 text-gold">
-                <Icon name="wallet" className="h-4 w-4" />
+              <span className="grid h-7 w-7 place-items-center" aria-hidden>
+                <Icon name="wallet" className="h-5 w-5 text-gold" />
               </span>
             )}
-            <span className="flex-1 text-[15px] font-medium text-text">{c.name}</span>
+            <span className="flex-1 text-[15px] font-medium text-text">{connectorLabel(c.id, c.name)}</span>
             {isPending && variables?.connector === c ? (
               <Icon name="spinner" className="h-4 w-4 text-gold" />
             ) : (
@@ -164,7 +169,7 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
     if (toastedFor.current === key) return;
     toastedFor.current = key;
     toast.ok(
-      isHolder ? "verified · holder" : "verified",
+      "verified",
       isHolder ? `holding ${session.balance} simp` : "wallet holds 0 simp — grab one on opensea",
     );
   }, [session, isHolder]);
@@ -193,19 +198,20 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
 
       {session ? (
         <div className="mt-6 space-y-5">
+          {/* a brass ring, like the bezel round the machine's win lamp */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.4 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 320, damping: 20, mass: 0.5 }}
-            className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-ok/15 text-ok shadow-[0_0_0_1px_rgba(126,226,179,.35),0_18px_50px_-16px_rgba(126,226,179,.5)]"
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className="mx-auto grid h-14 w-14 place-items-center rounded-full border-2 border-gold text-gold-hi shadow-[inset_0_0_0_4px_var(--ink-2),inset_0_0_0_5px_var(--gold-lo),0_1px_0_rgb(246_220_149/0.25)]"
             aria-hidden
           >
             <motion.svg
               viewBox="0 0 24 24"
-              className="h-8 w-8"
+              className="h-6 w-6"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2.4}
+              strokeWidth={2.2}
               strokeLinecap="round"
               strokeLinejoin="round"
             >
@@ -220,7 +226,6 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
 
           <div className="flex items-center gap-3">
             <span className={`pill ${isHolder ? "pill-ok" : "pill-warn"}`}>
-              <Icon name={isHolder ? "check" : "warn"} className="h-3 w-3" />
               {isHolder ? `holder · ${session.balance} simp` : "not a holder"}
             </span>
             <span className="pill">{session.method === "siwe" ? "signature" : "self-tx"}</span>

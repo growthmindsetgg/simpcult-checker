@@ -120,8 +120,8 @@ export function Portal() {
 
       {m?.admin && (
         <div>
-          <Link className={s.brass} href={`/portal/admin${fx ? `?fixture=${fx}` : ""}`}>
-            admin queue →
+          <Link className="btn btn-ghost" href={`/portal/admin${fx ? `?fixture=${fx}` : ""}`}>
+            admin queue
           </Link>
         </div>
       )}

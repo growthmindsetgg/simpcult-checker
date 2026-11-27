@@ -8,7 +8,6 @@ import { useSession } from "@/lib/useSession";
 import { useMounted } from "@/lib/useMounted";
 import { ProposalCard } from "@/components/dao/ProposalCard";
 import { WalletButton } from "@/components/wallet/WalletButton";
-import { Icon } from "@/components/Icon";
 import { Reveal, Stagger, Item, Spotlight } from "@/components/motion";
 import { PageHeader } from "@/components/PageHeader";
 import { NewProposal } from "./NewProposal";
@@ -37,7 +36,7 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
         aside={
           mounted && session && isHolder ? (
             <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!DAO_DEPLOYED}>
-              + new proposal
+              new proposal
             </button>
           ) : (
             <WalletButton />
@@ -46,14 +45,12 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       />
       <Reveal>
 
+      {/* not live yet. to go live: deploy contracts/SimpDAO.sol and set NEXT_PUBLIC_DAO_ADDRESS;
+          proposals then show up here on their own. */}
       {!DAO_DEPLOYED && (
-        <div className="glass mt-10 flex items-start gap-3 p-6 text-sm leading-relaxed text-dim">
-          <Icon name="warn" className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
-          <span className="min-w-0 break-words">
-            the dao contract isn&apos;t deployed yet. deploy <span className="mono">contracts/SimpDAO.sol</span> and set{" "}
-            <span className="mono">NEXT_PUBLIC_DAO_ADDRESS</span>. live proposals show up here on their own.
-          </span>
-        </div>
+        <p className="glass mt-10 px-6 py-5 font-serif text-[19px] italic leading-snug text-dim">
+          voting opens when the dao contract is live on monad.
+        </p>
       )}
 
       {DAO_DEPLOYED && cfg.data && cfg.data.period > 0 && (
@@ -70,7 +67,8 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
       <div className="segment mt-12">
         {(["live", "past", "archive"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} data-active={tab === t}>
-            {t} {t === "live" ? `· ${live.length}` : t === "past" ? `· ${past.length}` : `· ${shownArchive.length}`}
+            {t}
+            <span className="num">{t === "live" ? live.length : t === "past" ? past.length : shownArchive.length}</span>
           </button>
         ))}
       </div>
@@ -83,7 +81,11 @@ export function DaoHome({ archive }: { archive: ArchivedProposal[] }) {
 
       <NewProposal open={creating} onClose={() => setCreating(false)} />
       <p className="mt-12 text-[13px] text-mute">
-        need to verify first? open the wallet menu and sign in — or go to <Link href="/join" className="link">/join</Link>.
+        not verified yet? sign in from the wallet menu or on the{" "}
+        <Link href="/join" className="link">
+          join page
+        </Link>
+        .
       </p>
     </section>
   );
@@ -116,7 +118,7 @@ function ArchiveCard({ a }: { a: ArchivedProposal }) {
           );
         })}
       </div>
-      {a.link && <a className="link mt-4 inline-block text-xs" href={a.link} target="_blank" rel="noreferrer">source ↗</a>}
+      {a.link && <a className="link mt-4 inline-block text-xs" href={a.link} target="_blank" rel="noreferrer">source</a>}
     </div></Spotlight></Item>
   );
 }

@@ -43,7 +43,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: { default: `${NAME} · ${SITE.name}`, template: `%s · ${NAME}` },
   description: DESCRIPTION,
-  icons: { icon: "/favicon.ico" },
   openGraph: {
     title: NAME,
     description: DESCRIPTION,

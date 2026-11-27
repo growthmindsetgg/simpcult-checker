@@ -68,14 +68,14 @@ export function AdminQueue() {
     <div className={s.desk}>
       <header className={s.mast}>
         <div>
-          <span className={s.label}>back office</span>
+          <span className="plate">back office</span>
           <h1 className={s.mastTitle}>
-            the <em>pit boss</em>
+            the pit boss
           </h1>
           <p className={s.mastLead}>approve slips, hand out bonuses, run holding, freeze a season for settlement.</p>
         </div>
-        <Link className={s.brass} href={`/portal${fx ? `?fixture=${fx}` : ""}`}>
-          ← back to the desk
+        <Link className="btn btn-ghost" href={`/portal${fx ? `?fixture=${fx}` : ""}`}>
+          back to the desk
         </Link>
       </header>
 
@@ -145,11 +145,15 @@ function StatsPanel({ fx }: { fx: string | null }) {
     <section className={s.velvet}>
       <div className={s.panelHead}>
         <h2 className={s.panelTitle}>
-          season <em>{d?.overview.season ?? "—"}</em>
+          season {d?.overview.season ?? "—"}
         </h2>
         <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-          {d && !d.persistent && <span className={s.caps} style={{ color: "var(--d-bad)" }}>in-memory store · set UPSTASH_*</span>}
-          <button className={s.brass} disabled={run.isPending} onClick={() => run.mutate()}>
+          {d && !d.persistent && (
+            <span className="t-label" style={{ color: "var(--d-bad)" }}>
+              in-memory store: set UPSTASH_* to keep data
+            </span>
+          )}
+          <button className="btn btn-ghost" disabled={run.isPending} aria-busy={run.isPending} onClick={() => run.mutate()}>
             {run.isPending ? <span className={s.spin} aria-hidden /> : null} run holding now
           </button>
         </span>
@@ -176,9 +180,9 @@ function Pending({ q }: { q: Queue }) {
     <section className={s.velvet}>
       <div className={s.panelHead}>
         <h2 className={s.panelTitle}>
-          the <em>pile</em>
+          the pile
         </h2>
-        <span className={cx(s.caps, s.mute)}>{q.pending.length} waiting</span>
+        <span className="t-label">{q.pending.length} waiting</span>
       </div>
       {q.pending.length === 0 ? (
         <p className={s.boardEmpty}>pile&apos;s empty. go touch grass.</p>
@@ -287,7 +291,7 @@ function PendingSlip({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className={s.brass} disabled={review.isPending} onClick={() => review.mutate("approve")}>
+        <button className="btn btn-ghost btn-on-paper" disabled={review.isPending} onClick={() => review.mutate("approve")}>
           pay
         </button>
         <button className={cx(s.textBtn, s.rejectBtn)} disabled={review.isPending} onClick={() => review.mutate("reject")}>
@@ -378,7 +382,11 @@ function GrantForm() {
       </div>
       <div className={s.slipFoot}>
         <span className={s.slipHint}>grants come out of the season pool; revokes put points back.</span>
-        <button className={cx(s.brass, mode === "revoke" && s.rejectBtn)} disabled={m.isPending || !address || !amount || note.length < 3}>
+        <button
+          className={cx("btn btn-ghost btn-on-paper", mode === "revoke" && s.rejectBtn)}
+          disabled={m.isPending || !address || !amount || note.length < 3}
+          aria-busy={m.isPending}
+        >
           {mode}
         </button>
       </div>
@@ -418,7 +426,7 @@ function SettlePanel({ fx }: { fx: string | null }) {
   return (
     <section className={s.velvet}>
       <h2 className={s.panelTitle}>
-        settle a <em>season</em>
+        settle a season
       </h2>
       <p className={s.outText} style={{ margin: "10px 0 0", fontSize: 14 }}>
         freezes season-earned points into a merkle root for the soulbound xp contract. one way: a frozen season never changes.
@@ -436,7 +444,12 @@ function SettlePanel({ fx }: { fx: string | null }) {
           value={season}
           onChange={(e) => setSeason(e.target.value)}
         />
-        <button className={s.brass} disabled={!!st || freeze.isPending || Number(season) < 1} onClick={() => freeze.mutate()}>
+        <button
+          className="btn btn-ghost"
+          disabled={!!st || freeze.isPending || Number(season) < 1}
+          aria-busy={freeze.isPending}
+          onClick={() => freeze.mutate()}
+        >
           freeze
         </button>
       </div>

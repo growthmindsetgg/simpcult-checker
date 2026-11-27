@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LINKS, TEAM, NFT_ADDRESS, explorerAddress, short } from "@/lib/config";
+import { Logo } from "./Logo";
 import s from "./chrome.module.css";
 
 const HOUSE = [
@@ -13,7 +14,10 @@ export function Footer() {
   return (
     <footer className={s.footer}>
       <div className={`shell ${s.footInner}`}>
-        <p className={s.motto}>simping for what truly matters, until you actually get it.</p>
+        <div className={s.footBrand}>
+          <Logo variant="stacked" />
+          <p className={s.motto}>simping for what truly matters, until you actually get it.</p>
+        </div>
 
         <div className={s.footCols}>
           <nav aria-label="footer">

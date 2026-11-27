@@ -110,7 +110,7 @@ export function ModalShell({ open, onClose, children, className = "max-w-md" }: 
           onClick={onClose}
         >
           <motion.div
-            className={`glass max-h-[calc(100dvh-2rem)] w-full overflow-y-auto !rounded-[var(--r-xl)] p-6 md:p-7 ${className}`}
+            className={`glass max-h-[calc(100dvh-2rem)] w-full overflow-y-auto !rounded-[var(--key-radius-xl)] p-6 md:p-7 ${className}`}
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}

@@ -10,7 +10,9 @@ type Name =
   | "external"
   | "telegram"
   | "copy"
-  | "spinner";
+  | "spinner"
+  | "back"
+  | "chip";
 
 /** Tiny inline icon set (generic shapes, no brand marks). */
 export function Icon({ name, className = "h-4 w-4" }: { name: Name; className?: string }) {
@@ -18,7 +20,7 @@ export function Icon({ name, className = "h-4 w-4" }: { name: Name; className?: 
     className,
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 1.8,
+    strokeWidth: 1.6, // matches Bodoni's hairline-to-stem weight beside 500-600 text
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     viewBox: "0 0 24 24",
@@ -103,6 +105,20 @@ export function Icon({ name, className = "h-4 w-4" }: { name: Name; className?: 
       return (
         <svg {...p} className={`${className} animate-spin`}>
           <path d="M12 3a9 9 0 1 0 9 9" />
+        </svg>
+      );
+    case "back": // chevron-left, nudged right so it sits optically centred
+      return (
+        <svg {...p}>
+          <path d="M15.5 5l-7 7 7 7" />
+        </svg>
+      );
+    case "chip": // a house chip: rim, four edge inserts, inlay ring (so it never reads as a crosshair)
+      return (
+        <svg {...p}>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="3.5" />
+          <path d="M12 4v2.5M20 12h-2.5M12 20v-2.5M4 12h2.5" />
         </svg>
       );
   }

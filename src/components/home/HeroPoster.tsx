@@ -14,6 +14,15 @@ const BULBS = Array.from({ length: 11 }, (_, i) => {
 
 const HEART = "M8 13.2S1 9 1 4.6C1 2.4 2.7.8 4.7.8c1.4 0 2.6.8 3.3 2 .7-1.2 1.9-2 3.3-2 2 0 3.7 1.6 3.7 3.8C15 9 8 13.2 8 13.2Z";
 
+/* the wordmark's geometry, copied from Logo.tsx (stacked lockup) so the sign and
+   the nav/footer mark are one lockup. drawn at 27 units, baseline y=0, then scaled. */
+const WORD_DX = "0 -0.2 0 0";
+const TITTLE = { x: 14.25, y: -20.1, w: 6.5 };
+const SWASH =
+  "M42.6 5.9C34 6.9 22 7 12 5.8 6 5.1 1.2 4.6-1.6 2.9-2.4 2.4-2.8 1.7-2.6 1L-3.6 1.6C-3.8 2.8-2.6 3.9-1.2 4.6 1.6 5.8 6.4 6.5 12 7 22 8.2 34 8.1 42.8 6.7Z";
+const BALL = { cx: -2.75, cy: 0.75, r: 1.4 };
+const LOCKUP = { x: 8.6, y: 36, scale: 46 / 27 };
+
 function Cabinet() {
   return (
     <g id="cab">
@@ -78,12 +87,13 @@ export function HeroPoster() {
       <div className={s.cone} />
       <div className={s.floor} />
 
-      {/* the neon sign */}
-      <svg className={s.sign} viewBox="0 0 620 170" role="presentation">
+      {/* the neon sign: the house wordmark (stacked lockup) bent in tube. the lit
+          part is "sımp", its heart tittle and the swash; MACHINE is brass under it */}
+      <svg className={s.sign} viewBox="0 0 416 264" role="presentation">
         <defs>
-          <filter id="signGlow" x="-20%" y="-60%" width="140%" height="220%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b1" />
-            <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="b2" />
+          <filter id="signGlow" x="-20%" y="-40%" width="140%" height="180%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2.5" result="b1" />
+            <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="b2" />
             <feFlood floodColor="#ff3fae" />
             <feComposite in2="b2" operator="in" result="g2" />
             <feFlood floodColor="#ff5cbc" />
@@ -96,9 +106,20 @@ export function HeroPoster() {
             </feMerge>
           </filter>
         </defs>
-        <g filter="url(#signGlow)" className={s.signLit}>
-          <rect x="14" y="14" width="592" height="142" rx="71" fill="none" stroke="#ffc6e8" strokeWidth="3" />
-          <text x="310" y="112" textAnchor="middle" className={s.signText}>simp machine</text>
+        <g className={s.signLit}>
+          <g filter="url(#signGlow)">
+            <g transform={`scale(4) translate(${LOCKUP.x} ${LOCKUP.y}) scale(${LOCKUP.scale})`}>
+              <path d={SWASH} className={s.signSwash} />
+              <circle {...BALL} className={s.signSwash} />
+              <text x="0" y="0" dx={WORD_DX} className={s.signWord}>
+                sımp
+              </text>
+              <path d={HEART} transform={`translate(${TITTLE.x} ${TITTLE.y}) scale(${TITTLE.w / 16})`} fill="#ff3fae" />
+            </g>
+          </g>
+          <text x={4 * 9} y={4 * 63} className={s.signSub}>
+            MACHINE
+          </text>
         </g>
       </svg>
 

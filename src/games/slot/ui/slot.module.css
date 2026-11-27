@@ -20,8 +20,9 @@
   --paper-ink: #2a1620;
   --ok: #7fe0b0;
   --bad: #ff7a5c;
-  --f-display: "Bodoni Moda Variable", "Bodoni 72", Didot, "Bodoni MT", Georgia, serif;
-  --f-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* the site faces (next/font, layout.tsx), so the room and the HUD share one Bodoni */
+  --f-display: var(--display);
+  --f-mono: var(--font-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   --noise-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -122,7 +123,7 @@
 .bulbs > i {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #fff6d8, #e9b54c 55%, #8a5a14);
   box-shadow: 0 0 8px rgb(246 200 100 / 0.55);
 }
@@ -460,22 +461,9 @@
 .plaqueCell + .plaqueCell {
   border-left: 1px solid rgb(122 84 24 / 0.7);
 }
+/* the label itself is the global .plate; this only pins it left in the grid cell */
 .engraved {
   justify-self: start;
-  padding: 2px 8px 2px;
-  border-radius: 2px;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: #4a300a;
-  background: linear-gradient(180deg, #f3d891, #c99a3c 60%, #a07428);
-  text-shadow: 0 1px 0 rgb(255 240 200 / 0.55);
-  box-shadow:
-    inset 0 -1px 0 rgb(70 40 5 / 0.5),
-    inset 0 1px 0 rgb(255 248 220 / 0.6),
-    0 1px 2px rgb(0 0 0 / 0.6);
 }
 .balance {
   font-family: var(--f-display);
@@ -517,34 +505,14 @@
 
 .bet {
   display: grid;
-  grid-template-columns: 40px minmax(72px, auto) 40px;
+  grid-template-columns: 36px minmax(72px, auto) 36px;
   align-items: center;
-  height: 60px;
-  padding: 0 9px;
-  border-radius: 999px;
+  gap: 4px;
+  height: 68px; /* level with the spin key */
+  padding: 0 14px 3px; /* 3px: the keys stand on their skirts */
+  border-radius: var(--key-radius-xl, 12px);
   background: rgb(10 6 16 / 0.72);
   box-shadow: var(--hairline);
-}
-.betBtn {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  color: var(--gold-hi);
-  font-size: 20px;
-  line-height: 1;
-  box-shadow: inset 0 0 0 1px var(--gold-lo);
-  transition:
-    transform 0.14s var(--ease),
-    background-color 0.2s var(--ease),
-    opacity 0.2s;
-}
-.betBtn:active:not(:disabled) {
-  transform: scale(0.92);
-}
-.betBtn:disabled {
-  opacity: 0.3;
 }
 .betValue {
   text-align: center;
@@ -559,123 +527,25 @@
   color: var(--paper);
 }
 .betValue span {
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
   color: rgb(241 228 204 / 0.5);
   white-space: nowrap;
 }
 
-/* THE neon CTA. Unlit tube when disabled. */
+/* THE lit key (global .btn-primary.btn-xl). Only layout here, plus one
+   override: while the reels run it is aria-disabled (so a second press does
+   nothing) but stays lit and busy, not the dead bulb. */
 .spin {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  height: 72px;
   min-width: 188px;
-  padding: 0 34px 4px;
-  border-radius: 999px;
-  font-family: var(--f-display);
-  font-style: italic;
-  font-weight: 650;
-  font-size: 30px;
-  letter-spacing: 0.01em;
-  color: #2b0518;
-  cursor: pointer;
-  background: radial-gradient(ellipse 80% 70% at 50% 30%, #ffd2ee 0%, var(--neon-hot) 28%, var(--neon) 68%, #d1188a 100%);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 220 242 / 0.7),
-    inset 0 -5px 10px rgb(150 0 80 / 0.35),
-    0 0 0 5px rgb(255 63 174 / 0.14),
-    0 0 26px rgb(255 63 174 / 0.7),
-    0 0 90px rgb(255 63 174 / 0.35);
-  transition:
-    transform 0.16s var(--ease),
-    box-shadow 0.24s var(--ease),
-    background 0.24s var(--ease),
-    color 0.24s var(--ease);
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
 }
-.spin:active:not(:disabled) {
-  transform: scale(0.97) translateY(1px);
-}
-.spin:disabled {
-  cursor: not-allowed;
-  color: rgb(255 143 214 / 0.45);
-  background: linear-gradient(180deg, #3a0f2c, #2a0b1f);
-  box-shadow:
-    inset 0 0 0 1px rgb(255 63 174 / 0.35),
-    inset 0 2px 8px rgb(0 0 0 / 0.6);
-}
-.spin[data-busy="true"] {
-  cursor: progress;
-  filter: saturate(0.85) brightness(0.92);
-}
-.spin:focus-visible {
-  outline: 2px solid var(--gold-hi);
-  outline-offset: 4px;
-}
-.spin[data-size="slip"] {
-  height: 50px;
-  min-width: 0;
-  padding: 0 24px 3px;
-  font-size: 23px;
-}
-@media (hover: hover) and (pointer: fine) {
-  .spin:hover:not(:disabled):not([data-busy="true"]) {
-    box-shadow:
-      inset 0 0 0 1px rgb(255 230 246 / 0.85),
-      inset 0 -5px 10px rgb(150 0 80 / 0.35),
-      0 0 0 6px rgb(255 63 174 / 0.2),
-      0 0 32px rgb(255 63 174 / 0.85),
-      0 0 110px rgb(255 63 174 / 0.45);
-  }
-  .betBtn:hover:not(:disabled),
-  .brassBtn:hover:not(:disabled),
-  .iconBtn:hover {
-    background-color: rgb(217 168 69 / 0.1);
-  }
-}
-
-.brassBtn {
-  display: inline-grid;
-  place-items: center;
-  height: 40px;
-  padding: 0 15px;
-  border-radius: 2px;
-  font-size: 13px;
-  font-weight: 550;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  color: var(--gold-hi);
-  background: rgb(10 6 16 / 0.55);
-  box-shadow: var(--hairline);
-  transition:
-    transform 0.14s var(--ease),
-    background-color 0.2s var(--ease);
-}
-.brassBtn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-.brassBtn:disabled {
-  opacity: 0.4;
-}
-.iconBtn {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  color: var(--gold-hi);
-  background: rgb(10 6 16 / 0.55);
-  box-shadow: var(--hairline);
-  transition:
-    transform 0.14s var(--ease),
-    background-color 0.2s var(--ease);
-}
-.iconBtn:active {
-  transform: scale(0.94);
+.spin[aria-busy="true"] {
+  --insert: var(--key-insert-lit);
+  --insert-hover: var(--key-insert-lit);
+  --bezel: var(--key-bezel);
+  --legend: var(--key-legend-lit);
+  --key-hi: rgb(255 230 245 / 0.7);
+  --skirt: var(--key-skirt);
+  --_spill: var(--key-spill);
 }
 .textBtn {
   color: var(--gold-hi);
@@ -736,14 +606,14 @@
   position: absolute;
   top: -9px;
   right: 22px;
-  padding: 1px 7px;
+  padding: 0 8px 2px;
   border: 1.5px solid #a3214f;
   border-radius: 2px;
-  font-family: var(--f-mono);
-  font-size: 10px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  line-height: 1.15;
   color: #a3214f;
   background: var(--paper);
   opacity: 0.92;
@@ -769,11 +639,7 @@
 }
 .slipAction {
   display: grid;
-}
-.slipAction .brassBtn {
-  color: var(--paper-ink);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--paper-ink);
+  padding-bottom: 4px; /* room for the key's skirt */
 }
 
 /* ── drawers ────────────────────────────────────────────── */
@@ -965,10 +831,11 @@
   border-top: 1px solid rgb(122 84 24 / 0.5);
 }
 .kvLabel {
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
   color: var(--gold);
 }
 .hash {
@@ -980,14 +847,15 @@
 }
 .seedRow {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  padding-bottom: 4px;
 }
 .seedInput {
   flex: 1;
   min-width: 0;
-  height: 42px;
+  height: 44px;
   padding: 0 12px;
-  border-radius: 2px;
+  border-radius: var(--key-radius-sm, 6px);
   background: rgb(0 0 0 / 0.4);
   box-shadow: var(--hairline);
   color: var(--paper);
@@ -1027,15 +895,14 @@
   font-size: 18px;
 }
 .stamp {
-  padding: 1px 7px;
+  padding: 0 8px 2px;
   border: 1.5px solid currentColor;
   border-radius: 2px;
-  font-family: var(--f-mono);
-  font-style: normal;
-  font-size: 10.5px;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  line-height: 1.15;
   color: #8a7a80;
   transform: rotate(-4deg);
 }
@@ -1115,10 +982,6 @@
     gap: 4px;
     padding: 7px 12px 8px;
   }
-  .engraved {
-    font-size: 9px;
-    padding: 1px 6px;
-  }
   .balance {
     font-size: 27px;
   }
@@ -1137,27 +1000,13 @@
     min-width: 0;
     flex: 1;
     max-width: 220px;
-    height: 58px;
-    font-size: 26px;
   }
   .bet {
-    height: 54px;
-    grid-template-columns: 38px minmax(56px, auto) 38px;
-    padding: 0 7px;
-  }
-  .betBtn {
-    width: 38px;
-    height: 38px;
+    grid-template-columns: 36px minmax(56px, auto) 36px;
+    padding: 0 10px 3px;
   }
   .side {
     justify-self: center;
-  }
-  .brassBtn,
-  .iconBtn {
-    height: 36px;
-  }
-  .iconBtn {
-    width: 36px;
   }
   .domWrap {
     padding-top: 96px;
@@ -1188,11 +1037,6 @@
     font-size: 12.5px;
     line-height: 1.4;
   }
-  .spin[data-size="slip"] {
-    height: 46px;
-    padding: 0 18px 3px;
-    font-size: 21px;
-  }
   .banner {
     gap: 10px;
     padding: 6px 16px 8px;
@@ -1213,11 +1057,6 @@
 @media (hover: none) {
   .hint [data-howto] {
     display: none;
-  }
-}
-@media (max-width: 380px) {
-  .brassBtn {
-    padding: 0 11px;
   }
 }
 

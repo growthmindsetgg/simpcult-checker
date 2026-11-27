@@ -1,8 +1,5 @@
 "use client";
 
-import "@fontsource-variable/bodoni-moda";
-import "@fontsource-variable/bodoni-moda/wght-italic.css";
-import "@fontsource-variable/jetbrains-mono";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -160,7 +157,7 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
             stamp="members only"
             title="take a seat, simp."
             action={
-              <Link href="/join" className={styles.spin} data-size="slip">
+              <Link href="/join" className="btn btn-primary btn-lg">
                 sign in
               </Link>
             }
@@ -172,7 +169,7 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
             stamp="back soon"
             title="the machine is warming up."
             action={
-              <button type="button" className={styles.brassBtn} onClick={game.retry}>
+              <button type="button" className="btn btn-ghost btn-on-paper btn-sm" onClick={game.retry}>
                 try again
               </button>
             }
@@ -182,13 +179,13 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
         ) : (
           <div className={styles.plaque}>
             <div className={styles.plaqueCell}>
-              <span className={styles.engraved}>your points</span>
+              <span className={`plate ${styles.engraved}`}>your points</span>
               <span className={styles.balance} data-testid="slot-balance">
                 {ready ? fmt(game.balance) : "—"}
               </span>
             </div>
             <div className={styles.plaqueCell} data-zero={game.lastWin === 0}>
-              <span className={styles.engraved}>this spin</span>
+              <span className={`plate ${styles.engraved}`}>this spin</span>
               <span className={styles.thisSpin}>
                 <span id={game.winId} data-testid="slot-win">
                   0
@@ -205,12 +202,12 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
               <div className={styles.bet} role="group" aria-label="points per spin">
                 <button
                   type="button"
-                  className={styles.betBtn}
+                  className="btn btn-ghost btn-sm btn-icon"
                   onClick={() => game.changeBet(-1)}
                   disabled={spinning || bet === BET_STEPS[0]}
                   aria-label="fewer points per spin"
                 >
-                  −
+                  <BetGlyph />
                 </button>
                 <div className={styles.betValue}>
                   <strong>{fmt(bet)}</strong>
@@ -218,20 +215,20 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
                 </div>
                 <button
                   type="button"
-                  className={styles.betBtn}
+                  className="btn btn-ghost btn-sm btn-icon"
                   onClick={() => game.changeBet(1)}
                   disabled={spinning || bet === BET_STEPS[BET_STEPS.length - 1]}
                   aria-label="more points per spin"
                 >
-                  +
+                  <BetGlyph plus />
                 </button>
               </div>
               <button
                 type="button"
-                className={styles.spin}
+                className={`btn btn-primary btn-xl ${styles.spin}`}
                 onClick={() => void game.spin()}
                 disabled={!canSpin && !spinning}
-                data-busy={spinning}
+                aria-busy={spinning}
                 aria-disabled={spinning || !canSpin}
                 aria-keyshortcuts="Space"
               >
@@ -242,15 +239,15 @@ function Hud({ game, stage, onOpen }: { game: SlotGameApi; stage: boolean; onOpe
         </div>
 
         <div className={styles.side}>
-          <button type="button" className={styles.brassBtn} onClick={() => onOpen("paytable")}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen("paytable")}>
             pay card
           </button>
-          <button type="button" className={styles.brassBtn} onClick={() => onOpen("fairness")}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen("fairness")}>
             fairness
           </button>
           <button
             type="button"
-            className={styles.iconBtn}
+            className="btn btn-ghost btn-sm btn-icon"
             onClick={game.toggleMute}
             aria-pressed={game.muted}
             aria-label={game.muted ? "turn sound on" : "mute sound"}
@@ -331,7 +328,7 @@ function Sheet({ open, title, onClose, children }: { open: boolean; title: strin
       <div ref={ref} className={styles.sheet} data-open={open} role="dialog" aria-modal="true" aria-label={title} inert={!open}>
         <div className={styles.sheetHead}>
           <h2 className={styles.sheetTitle}>{title}</h2>
-          <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="close">
+          <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={onClose} aria-label="close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
@@ -341,6 +338,15 @@ function Sheet({ open, title, onClose, children }: { open: boolean; title: strin
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** − / + drawn, not typed: the display face's italic minus and plus sit off-centre in a square key */
+function BetGlyph({ plus = false }: { plus?: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <path d={plus ? "M6 12h12M12 6v12" : "M6 12h12"} />
+    </svg>
   );
 }
 

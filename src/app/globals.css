@@ -102,6 +102,27 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* wins only */
 
+  /* ── the button deck: every control is a key off the machine's own deck.
+     a lit (or unlit) acrylic insert in a brass bezel, sitting on a dark
+     brass skirt it drops into when pressed. pages may read these with
+     fallbacks, e.g. var(--key-radius, 8px). ─────────────────────────── */
+  --key-radius: 8px;
+  --key-radius-sm: 6px;
+  --key-radius-xl: 12px;
+  --key-bezel: linear-gradient(180deg, #f6dc95 0%, #d9a845 40%, #7a5418 100%);
+  --key-bezel-dead: linear-gradient(180deg, #6b5a3c 0%, #3b2c14 100%);
+  --key-skirt: #3d2608;
+  --key-travel: 3px;
+  --key-travel-lg: 4px;
+  --key-insert-lit: linear-gradient(180deg, #ff86cf 0%, #ff3fae 52%, #e0238f 100%);
+  --key-insert-lit-hover: linear-gradient(180deg, #ffa3db 0%, #ff52b7 52%, #e62a96 100%);
+  --key-insert-unlit: linear-gradient(180deg, #2a0b1f 0%, #170611 100%);
+  --key-insert-unlit-hover: linear-gradient(180deg, #3a0f2c 0%, #1d0716 100%);
+  --key-insert-dead: linear-gradient(180deg, #1a0e1f 0%, #120914 100%);
+  --key-legend-lit: #2b0518;
+  --key-spill: 0 0 22px -8px rgb(255 63 174 / 0.55);
+  --key-spill-hover: 0 0 30px -6px rgb(255 63 174 / 0.7);
+
   /* fine film grain, baked at low alpha so it can sit in any background stack */
   --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
 }
@@ -177,9 +198,11 @@ body::after {
   background: var(--neon);
   color: var(--ink);
 }
+/* unlayered, so components can't out-cascade it: they steer it through
+   --focus-ring / --focus-offset instead (keys push the ring past their skirt) */
 :focus-visible {
-  outline: 2px solid var(--gold-hi);
-  outline-offset: 3px;
+  outline: 2px solid var(--focus-ring, var(--gold-hi));
+  outline-offset: var(--focus-offset, 3px);
 }
 button,
 a {
@@ -319,7 +342,7 @@ a {
       var(--noise), radial-gradient(120% 70% at 50% -10%, rgba(74, 18, 54, 0.38), transparent 62%),
       linear-gradient(180deg, #1c0917 0%, #13070f 100%);
     border: 1px solid rgba(122, 84, 24, 0.62);
-    border-radius: var(--r-lg);
+    border-radius: var(--key-radius); /* cards share the keys' corner */
     box-shadow:
       inset 0 0 0 1px rgba(246, 220, 149, 0.06),
       inset 0 1px 0 rgba(246, 220, 149, 0.16),
@@ -355,106 +378,313 @@ a {
     }
   }
 
-  /* ── buttons ──────────────────────────────────────────────── */
+  /* ── the button deck ──────────────────────────────────────────
+     every .btn is a key: an acrylic insert (padding-box) inside a brass
+     bezel (border-box), standing on a skirt (a hard 0-blur shadow) that it
+     drops into when pressed. all state runs through custom properties so a
+     parent can drive it too (see .key-host):
+       --key-glow   0|1  backlight up (hover)       → ::before opacity, spill
+       --key-press  0|1  key held down               → translateY + skirt collapse
+     variants only set the material vars (--insert, --bezel, --legend …). */
   .btn {
+    /* material (bare .btn = a complete unlit key) */
+    --insert: var(--key-insert-unlit);
+    --insert-hover: var(--key-insert-unlit-hover);
+    --bezel: var(--key-bezel);
+    --legend: var(--gold-hi);
+    --legend-hover: #fff6df;
+    --key-hi: rgb(246 220 149 / 0.14);
+    --seam: rgb(0 0 0 / 0.4);
+    --skirt: var(--key-skirt);
+    --drop: rgb(5 0 6 / 0.9);
+    --spill-rest: 0 0 0 0 transparent;
+    --spill-hover: 0 0 0 0 transparent;
+    /* geometry */
+    --r: var(--key-radius);
+    --bw: 1.5px;
+    --travel: var(--key-travel);
+    /* state */
+    --key-glow: 0;
+    --key-press: 0;
+    --key-t: 160ms;
+    --key-ease: var(--ease-out);
+    --_spill: var(--spill-rest);
+    /* the ring clears the skirt instead of cutting through it */
+    --focus-offset: calc(var(--travel) + 1px);
+
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.45em;
     height: 44px;
-    padding: 0 1.3rem;
-    border-radius: 999px;
-    font-size: 14px;
+    padding: 0 20px 1px; /* 1px: italic lowercase sits optically low on line-height 1 */
+    border: var(--bw) solid transparent;
+    border-radius: var(--r);
+    background:
+      var(--insert) padding-box,
+      var(--bezel) border-box;
+    color: var(--legend);
+    font-family: var(--display);
+    font-style: italic;
     font-weight: 600;
-    letter-spacing: 0.005em;
+    font-size: 17px;
+    font-optical-sizing: auto;
+    font-variant-numeric: lining-nums tabular-nums;
+    letter-spacing: -0.005em;
     line-height: 1;
     white-space: nowrap;
+    text-decoration: none;
     cursor: pointer;
-    border: 1px solid transparent;
     user-select: none;
     -webkit-user-select: none;
+    transform: translateY(calc(var(--key-press) * var(--travel)));
+    box-shadow:
+      inset 0 1px 0 var(--key-hi),
+      inset 0 0 0 1px var(--seam),
+      inset 0 calc(-2px + 4px * var(--key-press)) calc(5px * var(--key-press)) rgb(0 0 0 / calc(0.28 + 0.07 * var(--key-press))),
+      0 calc((1 - var(--key-press)) * var(--travel)) 0 var(--skirt),
+      0 calc(8px - 5px * var(--key-press)) calc(16px - 10px * var(--key-press)) calc(-8px + 5px * var(--key-press)) var(--drop),
+      var(--_spill);
     transition:
-      transform 0.16s var(--ease-out),
-      box-shadow 0.25s ease,
-      background-color 0.2s ease,
-      border-color 0.2s ease,
-      color 0.2s ease,
-      opacity 0.2s ease;
+      transform var(--key-t) var(--key-ease),
+      box-shadow var(--key-t) var(--key-ease),
+      color 120ms ease;
   }
-  .btn:active:not(:disabled) {
-    transform: scale(0.97);
+  /* the backlight: the hover insert on a layer that fades (gradients can't interpolate) */
+  .btn::before {
+    content: "";
+    position: absolute;
+    inset: 1px; /* leaves the seam and top highlight showing */
+    z-index: -1;
+    border-radius: calc(var(--r) - var(--bw) - 1px); /* concentric with the bezel */
+    background: var(--insert-hover);
+    opacity: var(--key-glow);
+    pointer-events: none;
+    transition: opacity 120ms ease;
   }
-  .btn:disabled {
-    opacity: 0.42;
+  /* hit area: covers the bezel, and while held it reaches up over the strip the
+     key just travelled away from, so a press on the top edge still clicks */
+  .btn::after {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--bw));
+  }
+  .btn:active::after,
+  .key-host:active .btn::after {
+    top: calc(-1 * (var(--bw) + var(--travel) + 1px));
+  }
+
+  /* hover: the backlight comes up; the box never moves */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+    .key-host:hover .btn:not(:disabled, [aria-disabled="true"], [aria-busy="true"]) {
+      --key-glow: 1;
+      --_spill: var(--spill-hover);
+      color: var(--legend-hover);
+    }
+  }
+  /* press: 60ms linear down onto the skirt; release springs back on the 160ms ease-out */
+  .btn:active:not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+  .key-host:active .btn:not(:disabled, [aria-disabled="true"], [aria-busy="true"]) {
+    --key-press: 1;
+    --key-t: 60ms;
+    --key-ease: linear;
+  }
+
+  /* dead bulb: no light, dull bezel, opacity stays 1 */
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    --insert: var(--key-insert-dead);
+    --insert-hover: var(--key-insert-dead);
+    --bezel: var(--key-bezel-dead);
+    --legend: var(--text-3);
+    --key-hi: rgb(246 220 149 / 0.05);
+    --skirt: #24180a;
+    --_spill: 0 0 0 0 transparent;
     cursor: not-allowed;
   }
+  .btn[aria-busy="true"] {
+    cursor: progress;
+    filter: saturate(0.85) brightness(0.92);
+  }
+
+  /* anything mono inside a key (a wallet address) stays mono and upright */
+  .btn .mono {
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12.5px;
+    letter-spacing: 0;
+  }
+  /* icon side sits 2px tighter than the text side */
+  .btn > svg {
+    flex-shrink: 0;
+  }
+  .btn > svg:first-child:not(:only-child) {
+    margin-inline-start: -2px;
+  }
+  .btn > svg:last-child:not(:only-child) {
+    margin-inline-end: -2px;
+  }
+
+  /* ── sizes ── height / padding-inline / legend */
   .btn-sm {
+    --r: var(--key-radius-sm);
     height: 36px;
-    padding: 0 0.95rem;
-    font-size: 13px;
+    padding: 0 14px 1px;
+    font-size: 15px;
+    /* legibility at 1x: pin a small optical size (stouter hairlines, looser fit)
+       and a touch more weight, so 15px italic survives light-on-dark */
+    font-variation-settings: "opsz" 10;
+    font-weight: 650;
   }
   .btn-lg {
+    --travel: var(--key-travel-lg);
     height: 52px;
-    padding: 0 1.7rem;
-    font-size: 15px;
+    padding: 0 26px 1px;
+    font-size: 19px;
   }
-  /* a lit neon tube: hot core, soft bloom. reserve it for the one action per view */
-  .btn-primary {
-    color: #23030f;
-    background-color: var(--neon);
-    border-color: rgba(255, 196, 232, 0.7);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 230, 245, 0.55),
-      inset 0 -10px 18px -10px rgba(150, 0, 75, 0.55),
-      0 0 0 1px rgb(var(--simp-rgb) / 0.3),
-      0 0 16px -2px rgb(var(--simp-rgb) / 0.7),
-      0 0 44px -8px rgb(var(--simp-rgb) / 0.55);
+  .btn-xl {
+    --r: var(--key-radius-xl);
+    --bw: 2px;
+    --travel: var(--key-travel-lg);
+    height: 68px;
+    padding: 0 36px 2px;
+    font-size: 28px;
+    letter-spacing: -0.012em;
   }
-  @media (hover: hover) and (pointer: fine) {
-    .btn-primary:hover:not(:disabled) {
-      background-color: #ff5bbb;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 230, 245, 0.6),
-        inset 0 -10px 18px -10px rgba(150, 0, 75, 0.5),
-        0 0 0 1px rgb(var(--simp-rgb) / 0.45),
-        0 0 22px 0 rgb(var(--simp-rgb) / 0.8),
-        0 0 64px -6px rgb(var(--simp-rgb) / 0.6);
-    }
+  /* square key for a lone glyph */
+  .btn-icon {
+    width: 44px;
+    padding: 0;
   }
-  /* brass outline: every secondary action */
-  .btn-ghost {
-    color: var(--gold-hi);
-    background-color: rgba(217, 168, 69, 0.03);
-    border-color: rgba(217, 168, 69, 0.42);
-    box-shadow: inset 0 1px 0 rgba(246, 220, 149, 0.08);
+  .btn-icon > svg {
+    width: 18px;
+    height: 18px;
   }
-  @media (hover: hover) and (pointer: fine) {
-    .btn-ghost:hover:not(:disabled) {
-      color: #fff6df;
-      background-color: rgba(217, 168, 69, 0.09);
-      border-color: rgba(217, 168, 69, 0.8);
-    }
+  .btn-sm.btn-icon {
+    width: 36px;
   }
-  .btn-danger {
-    color: var(--bad);
-    background-color: rgba(255, 122, 92, 0.05);
-    border-color: rgba(255, 122, 92, 0.32);
+  .btn-lg.btn-icon {
+    width: 52px;
   }
-  @media (hover: hover) and (pointer: fine) {
-    .btn-danger:hover:not(:disabled) {
-      background-color: rgba(255, 122, 92, 0.12);
+  .btn-xl.btn-icon {
+    width: 68px;
+  }
+  .btn-xl.btn-icon > svg {
+    width: 24px;
+    height: 24px;
+  }
+  /* small keys keep a 44px touch target on coarse pointers */
+  @media (pointer: coarse) {
+    .btn-sm::after {
+      inset: -4px calc(-1 * var(--bw));
     }
   }
 
-  /* ── inputs ───────────────────────────────────────────────── */
+  /* ── variants ── */
+  /* the lit key: the light is inside the acrylic, with one tight spill */
+  .btn-primary {
+    --insert: var(--key-insert-lit);
+    --insert-hover: var(--key-insert-lit-hover);
+    --legend: var(--key-legend-lit);
+    --legend-hover: #1e0310;
+    --key-hi: rgb(255 230 245 / 0.7);
+    --seam: rgb(122 0 64 / 0.35);
+    --spill-rest: var(--key-spill);
+    --spill-hover: var(--key-spill-hover);
+  }
+  /* a lit key switched off is the unlit tube, not a muddy translucent pink */
+  .btn-primary:disabled,
+  .btn-primary[aria-disabled="true"] {
+    --insert: linear-gradient(180deg, #3a0f2c, #2a0b1f);
+    --insert-hover: var(--insert);
+    --legend: rgb(255 143 214 / 0.45);
+    --key-hi: rgb(255 143 214 / 0.08);
+  }
+  /* the unlit key: smoked velvet acrylic, brass legend */
+  .btn-ghost {
+    --insert: var(--key-insert-unlit);
+    --insert-hover: var(--key-insert-unlit-hover);
+    --legend: var(--gold-hi);
+    --legend-hover: #fff6df;
+    --key-hi: rgb(246 220 149 / 0.14);
+  }
+  .btn-danger {
+    --insert: var(--key-insert-unlit);
+    --insert-hover: linear-gradient(rgb(255 122 92 / 0.1), rgb(255 122 92 / 0.1)), var(--key-insert-unlit);
+    --legend: var(--bad);
+    --legend-hover: #ff9a82;
+    --key-hi: rgb(255 122 92 / 0.14);
+  }
+  /* a key set into cream stock (pair with .btn-ghost) */
+  .btn-on-paper {
+    /* opaque: paper tinted 2→7% paper-ink (the bezel sits under the padding box) */
+    --insert: linear-gradient(180deg, #ede0c9, #e3d5c0);
+    --insert-hover: linear-gradient(180deg, #e5d7c2, #d7c9b6);
+    --bezel: linear-gradient(180deg, #5a3a14, #2b1320);
+    --legend: var(--paper-ink);
+    --legend-hover: #14060e;
+    --key-hi: rgb(255 255 255 / 0.5);
+    --seam: rgb(43 19 32 / 0.18);
+    --skirt: rgb(43 19 32 / 0.45);
+    --drop: rgb(43 19 32 / 0.32);
+    --focus-ring: var(--paper-ink);
+  }
+  .btn-on-paper:disabled,
+  .btn-on-paper[aria-disabled="true"] {
+    --insert: linear-gradient(180deg, #e9dcc5, #e9dcc5);
+    --insert-hover: var(--insert);
+    --bezel: linear-gradient(180deg, #b19c7f, #9d8a7c);
+    --legend: rgb(43 19 32 / 0.45);
+    --skirt: rgb(43 19 32 / 0.2);
+  }
+
+  /* ── labels ── */
+  /* an engraved brass plate: the label screwed to the cabinet. sentence case, never caps */
+  .plate {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 10px 1px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold) 48%, #b48632 52%, var(--gold-lo));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      inset 0 -1px 0 rgb(0 0 0 / 0.35),
+      0 1px 2px rgb(0 0 0 / 0.6);
+    color: #3a2408;
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 13.5px;
+    font-variation-settings: "opsz" 9; /* stouter hairlines at plate size */
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
+    text-shadow: 0 1px 0 rgb(255 238 196 / 0.55);
+    white-space: nowrap;
+  }
+  /* the small key beside a data value ("rank", "earned this season") */
+  .t-label {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-3);
+  }
+
+  /* ── inputs: a recessed well ──────────────────────────────── */
   .input {
     width: 100%;
     height: 48px;
     padding: 0 1rem;
     background: rgba(6, 3, 9, 0.72);
     border: 1px solid var(--line-strong);
-    border-radius: var(--r-md);
+    border-radius: var(--key-radius-sm);
     color: var(--text);
     font-size: 16px; /* 16px stops iOS zoom-on-focus */
     outline: none;
@@ -468,6 +698,11 @@ a {
     padding: 0.9rem 1rem;
     line-height: 1.6;
   }
+  @media (hover: hover) and (pointer: fine) {
+    .input:hover:not(:disabled, :focus) {
+      border-color: rgb(217 168 69 / 0.5);
+    }
+  }
   .input:focus-visible,
   .input:focus {
     border-color: var(--gold);
@@ -478,46 +713,68 @@ a {
   .input::placeholder {
     color: var(--text-3);
   }
+  .input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .input[aria-invalid="true"] {
     border-color: rgba(255, 122, 92, 0.65);
+    box-shadow:
+      inset 0 2px 6px rgba(0, 0, 0, 0.45),
+      0 0 0 3px rgb(255 122 92 / 0.16);
   }
 
-  /* ── status chips: a punched ticket stub ──────────────────── */
+  /* ── status: a smoked window with an indicator lamp ───────── */
   .pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 7px;
     height: 24px;
-    padding: 0 0.6rem;
-    border-radius: var(--r-sm);
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: 11.5px;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
+    padding: 0 9px;
+    border-radius: 4px;
+    background: rgb(6 3 9 / 0.6);
     border: 1px solid var(--line-strong);
     color: var(--text-2);
-    background: rgba(217, 168, 69, 0.04);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .pill-ok,
+  .pill-warn,
+  .pill-bad,
+  .pill-simp {
+    color: var(--text);
+  }
+  .pill-ok::before,
+  .pill-warn::before,
+  .pill-bad::before,
+  .pill-simp::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--lamp);
+    box-shadow:
+      0 0 6px var(--lamp),
+      inset 0 -1px 1px rgb(0 0 0 / 0.25);
   }
   .pill-ok {
-    color: var(--ok);
-    border-color: rgba(127, 224, 176, 0.32);
-    background: rgba(127, 224, 176, 0.07);
+    --lamp: var(--ok);
   }
   .pill-warn {
-    color: var(--warn);
-    border-color: rgba(242, 196, 107, 0.34);
-    background: rgba(242, 196, 107, 0.07);
+    --lamp: var(--warn);
   }
   .pill-bad {
-    color: var(--bad);
-    border-color: rgba(255, 122, 92, 0.34);
-    background: rgba(255, 122, 92, 0.07);
+    --lamp: var(--bad);
   }
   .pill-simp {
+    --lamp: var(--neon);
     color: var(--neon-hot);
-    border-color: rgb(var(--simp-rgb) / 0.45);
-    background: rgb(var(--simp-rgb) / 0.1);
   }
 
   /* ── misc ─────────────────────────────────────────────────── */
@@ -559,25 +816,29 @@ a {
     display: inline-flex;
     gap: 2px;
     padding: 3px;
-    border-radius: var(--r-md);
+    border-radius: var(--key-radius);
     background: rgba(6, 3, 9, 0.6);
     border: 1px solid var(--line-strong);
+    box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.45);
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .segment > button {
     height: 34px;
-    padding: 0 0.95rem;
-    border-radius: var(--r-sm);
-    font-size: 13px;
-    font-weight: 600;
+    padding: 0 14px 1px;
+    border-radius: calc(var(--key-radius) - 4px); /* concentric: rail 8 − (3 pad + 1 border) */
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 15px;
+    font-variation-settings: "opsz" 10;
+    line-height: 1;
     color: var(--text-3);
     white-space: nowrap;
     transition:
-      background-color 0.2s ease,
-      color 0.2s ease,
-      box-shadow 0.2s ease;
+      color 120ms ease,
+      box-shadow 120ms ease;
   }
   @media (hover: hover) and (pointer: fine) {
     .segment > button:hover {
@@ -586,10 +847,20 @@ a {
   }
   .segment > button[data-active="true"] {
     color: var(--gold-hi);
-    background-color: var(--velvet);
+    background: var(--key-insert-unlit-hover);
     box-shadow:
-      inset 0 0 0 1px rgba(217, 168, 69, 0.45),
-      inset 0 1px 0 rgba(246, 220, 149, 0.18);
+      inset 0 0 0 1px rgb(217 168 69 / 0.55),
+      inset 0 1px 0 rgb(246 220 149 / 0.2),
+      0 1px 0 var(--key-skirt);
+  }
+  /* a count inside a segment: upright mono, quieter than the label */
+  .segment .num {
+    margin-left: 6px;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    opacity: 0.7;
   }
 
   /* ── legacy display helpers (games + portal) ──────────────────── */
@@ -622,27 +893,6 @@ a {
     display: grid;
     gap: 18px;
   }
-}
-
-/* ── the wordmark (nav, footer) ───────────────────────────────── */
-.wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--display);
-  font-optical-sizing: auto;
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1;
-  white-space: nowrap;
-}
-.wordmark-heart {
-  width: 11px;
-  height: 10px;
-  color: var(--neon);
-  filter: drop-shadow(0 0 4px rgb(255 63 174 / 0.9)) drop-shadow(0 0 10px rgb(255 63 174 / 0.5));
-  transform: translateY(1px);
 }
 
 .tilt {
@@ -713,7 +963,7 @@ a {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 13px 14px 13px 16px;
+  padding: 15px 14px 13px;
   border-radius: 3px;
   background: var(--noise), linear-gradient(180deg, var(--paper), var(--paper-2));
   color: var(--paper-ink);
@@ -724,34 +974,24 @@ a {
   font-size: 13.5px;
   line-height: 1.4;
 }
+/* the top edge is perforated: torn off the roll, not a coloured carbon strip */
 .toast::before {
-  /* tone strip down the left edge, like a coloured carbon copy */
   content: "";
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  border-radius: 3px 0 0 3px;
-  background: var(--gold-lo);
-}
-.toast[data-tone="ok"]::before {
-  background: #2f9a69;
-}
-.toast[data-tone="bad"]::before {
-  background: var(--paper-red);
-}
-.toast[data-tone="warn"]::before {
-  background: #b9852a;
+  right: 0;
+  top: -4px;
+  height: 8px;
+  background: radial-gradient(circle at 7px 50%, var(--ink) 3px, transparent 3.6px) 0 0 / 14px 8px round no-repeat;
+  pointer-events: none;
 }
 .toast .toast-icon {
   display: grid;
   place-items: center;
-  height: 20px;
-  width: 20px;
+  height: 16px;
+  width: 16px;
   margin-top: 1px;
-  border-radius: 999px;
-  border: 1.5px solid currentColor;
+  border: 0;
   color: var(--gold-lo);
   flex-shrink: 0;
 }

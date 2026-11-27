@@ -26,7 +26,7 @@ export function Hero() {
           here that takes them.
         </p>
         <div className={s.heroActions}>
-          <Link href="/games/slot" className={`btn btn-primary btn-lg ${s.neonCta}`}>
+          <Link href="/games/slot" className="btn btn-primary btn-lg">
             play the machine
           </Link>
           <Link href="/portal" className={s.quietCta}>

@@ -37,7 +37,7 @@ export function Earn() {
           <article className={`${s.ticket} ${s.ticketA}`} aria-labelledby="t-checkin">
             <div className={s.paper}>
               <div className={s.ticketBody}>
-                <p className={s.ticketSerial}>daily · resets 00:00 utc</p>
+                <p className={s.ticketSerial}>daily, resets 00:00 utc</p>
                 <h3 id="t-checkin" className={s.ticketTitle}>
                   say gsimp
                 </h3>
@@ -268,7 +268,7 @@ export function Portraits() {
                   />
                 </div>
               </div>
-              <span className={s.plate}>no. {n}</span>
+              <span className="plate">no. {n}</span>
             </li>
           ))}
         </ul>
@@ -288,7 +288,7 @@ export function Finale() {
         <div className={s.finaleSide}>
           <p className={s.lead}>check in today and your streak starts today. tomorrow it&rsquo;s a day shorter.</p>
           <div className={s.heroActions}>
-            <Link href="/portal" className={`btn btn-primary btn-lg ${s.neonCta}`}>
+            <Link href="/portal" className="btn btn-primary btn-lg">
               say gsimp
             </Link>
             <Link href="/games/slot" className={s.quietCta}>

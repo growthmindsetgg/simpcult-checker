@@ -156,13 +156,12 @@ function ProveOwnership({
     return (
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <span className={`pill ${isHolder ? "pill-ok" : "pill-warn"}`}>
-          <Icon name={isHolder ? "check" : "warn"} className="h-3 w-3" />
-          {isHolder ? `holder · ${session.balance} simp` : "0 simp"}
+          {isHolder ? `holder, ${session.balance} simp` : "0 simp"}
         </span>
         <span className="pill">{session.method === "siwe" ? "signature" : "self-tx"}</span>
         {!isHolder && (
           <a className="link text-xs" href={LINKS.opensea} target="_blank" rel="noreferrer">
-            this wallet holds no simp cult nft — get one on opensea →
+            this wallet holds no simp cult nft. get one on opensea
           </a>
         )}
       </div>

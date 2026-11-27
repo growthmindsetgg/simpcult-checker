@@ -62,9 +62,9 @@ export function Mast({ info }: { info?: SeasonInfo }) {
   return (
     <header className={s.mast}>
       <div>
-        <span className={s.label}>the points desk</span>
+        <span className="plate">the points desk</span>
         <h1 className={s.mastTitle}>
-          simp <em>points</em>
+          simp points
         </h1>
         <p className={s.mastLead}>
           check in, post about the cult, bring alpha. every simp move stacks points, and every season the machine pays out
@@ -72,7 +72,7 @@ export function Mast({ info }: { info?: SeasonInfo }) {
         </p>
       </div>
       <div className={s.clock}>
-        <span className={s.caps + " " + s.mute}>season {n}</span>
+        <span className={s.tag}>season {n}</span>
         <span className={s.clockTime} title={target ? new Date(target).toUTCString() : undefined}>
           {target !== null && now !== null ? `${live ? "closes in" : "opens in"} ${countdown(target - now)}` : "—"}
         </span>
@@ -87,7 +87,7 @@ export function Plaque({ me }: { me?: Me }) {
   return (
     <section className={s.plaque} aria-label="your balance">
       <div className={s.plaqueTop}>
-        <span className={s.label}>your stack</span>
+        <span className="plate">your stack</span>
         <span className={cx(s.mono, s.mute)} style={{ fontSize: 12 }}>
           {me ? short(me.address) : "no wallet"}
         </span>
@@ -205,7 +205,7 @@ export function CheckinTicket({ variant, me, season }: { variant: TicketVariant;
             </ol>
             <div className={s.holesKey}>
               {variant === "live" || variant === "members"
-                ? `streak ${streak} day${streak === 1 ? "" : "s"}${streak >= MAX_STREAK_DAYS ? " · max bonus" : ""}`
+                ? `streak ${streak} day${streak === 1 ? "" : "s"}${streak >= MAX_STREAK_DAYS ? ", max bonus" : ""}`
                 : `${MAX_STREAK_DAYS} punches to a 2× ticket`}
             </div>
           </div>
@@ -219,16 +219,21 @@ export function CheckinTicket({ variant, me, season }: { variant: TicketVariant;
 
       <div className={s.ctaRow}>
         {variant === "live" && !punched && (
-          <button className={cx(s.neon, s.wide)} disabled={punch.isPending} onClick={() => punch.mutate()}>
+          <button
+            className={cx("btn btn-primary btn-lg", s.wide)}
+            disabled={punch.isPending}
+            aria-busy={punch.isPending}
+            onClick={() => punch.mutate()}
+          >
             {punch.isPending ? <Spin /> : null} punch today&apos;s ticket
           </button>
         )}
         {variant === "live" && punched && (
-          <span className={s.under}>next ticket in {now !== null ? countdown(nextUtcMidnight(now) - now) : "—"} · 00:00 utc</span>
+          <span className={s.under}>next ticket in {now !== null ? countdown(nextUtcMidnight(now) - now) : "—"}, at 00:00 utc</span>
         )}
         {variant === "signedout" && (
           <>
-            <button className={cx(s.neon, s.wide)} onClick={() => setWalletOpen(true)}>
+            <button className={cx("btn btn-primary btn-lg", s.wide)} onClick={() => setWalletOpen(true)}>
               connect wallet
             </button>
             <WalletModal open={walletOpen} onClose={() => setWalletOpen(false)} />
@@ -237,8 +242,9 @@ export function CheckinTicket({ variant, me, season }: { variant: TicketVariant;
         {variant === "signin" && (
           <>
             <button
-              className={s.neon}
+              className="btn btn-primary btn-lg"
               disabled={sig.isPending}
+              aria-busy={sig.isPending}
               onClick={() =>
                 sig.mutate(undefined, {
                   onError: (e) => toast.bad("signature didn't go through", (e as Error).message.split("\n")[0]),
@@ -253,8 +259,8 @@ export function CheckinTicket({ variant, me, season }: { variant: TicketVariant;
           </>
         )}
         {variant === "members" && (
-          <a className={s.brass} href={LINKS.opensea} target="_blank" rel="noreferrer">
-            find a simp ↗
+          <a className="btn btn-ghost" href={LINKS.opensea} target="_blank" rel="noreferrer">
+            find a simp
           </a>
         )}
         {variant === "closed" && <span className={s.under}>check back when the clock hits zero.</span>}
@@ -278,9 +284,9 @@ export function SlipDesk({ me, hot }: { me: Me; hot: boolean }) {
     <section className={s.velvet} aria-labelledby="slip-title">
       <div className={s.panelHead}>
         <h2 id="slip-title" className={s.panelTitle}>
-          drop your <em>slip</em>
+          drop your slip
         </h2>
-        <span className={cx(s.caps, s.mute)}>{fmt(me.caps[tab] ?? 0)} left today</span>
+        <span className="t-label">{fmt(me.caps[tab] ?? 0)} left today</span>
       </div>
 
       <div className={s.tabs} role="tablist" aria-label="slip type">
@@ -346,7 +352,7 @@ function HandleRow({ me }: { me: Me }) {
             <span className={s.slipLabel}>member </span> @{me.x.handle}
           </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
-            {me.x.verified ? <span className={s.verified}>✓ verified</span> : <span className={s.slipHint}>unverified</span>}
+            {me.x.verified ? <span className={s.verified}>verified</span> : <span className={s.slipHint}>unverified</span>}
             <button type="button" className={s.textBtn} style={{ color: "inherit" }} onClick={() => setEditing(true)}>
               change
             </button>
@@ -384,7 +390,7 @@ function HandleRow({ me }: { me: Me }) {
                 inputMode="url"
                 autoComplete="off"
               />
-              <button className={s.brass} disabled={!url.trim() || verify.isPending}>
+              <button className={"btn btn-ghost btn-on-paper"} disabled={!url.trim() || verify.isPending} aria-busy={verify.isPending}>
                 {verify.isPending ? <Spin /> : null} verify
               </button>
             </form>
@@ -416,7 +422,7 @@ function HandleRow({ me }: { me: Me }) {
           autoCapitalize="none"
           spellCheck={false}
         />
-        <button className={s.brass} disabled={!handle.trim() || claim.isPending}>
+        <button className={"btn btn-ghost btn-on-paper"} disabled={!handle.trim() || claim.isPending} aria-busy={claim.isPending}>
           {claim.isPending ? <Spin /> : null} {me.x ? "switch" : "save"}
         </button>
         {me.x && (
@@ -499,7 +505,11 @@ function PostSlip({
                   ? "verified handle: pays on the spot if x confirms it."
                   : "goes to the review pile until your handle is verified."}
         </span>
-        <button className={hot ? s.neon : s.brass} disabled={!ready || !url.trim() || m.isPending}>
+        <button
+          className={hot ? "btn btn-primary" : "btn btn-ghost btn-on-paper"}
+          disabled={!ready || !url.trim() || m.isPending}
+          aria-busy={m.isPending}
+        >
           {m.isPending ? <Spin /> : null} drop it in
         </button>
       </div>
@@ -580,7 +590,11 @@ function AlphaSlip({ me, hot, onDone }: { me: Me; hot: boolean; onDone: (s: Subm
         <span className={s.slipHint}>
           {!me.holder ? "alpha slips are for simp cult holders." : left < 1 ? "three a day. back after 00:00 utc." : "reviewed weekly."}
         </span>
-        <button className={hot ? s.neon : s.brass} disabled={off || title.trim().length < 4 || !proof.trim() || m.isPending}>
+        <button
+          className={hot ? "btn btn-primary" : "btn btn-ghost btn-on-paper"}
+          disabled={off || title.trim().length < 4 || !proof.trim() || m.isPending}
+          aria-busy={m.isPending}
+        >
           {m.isPending ? <Spin /> : null} send it up
         </button>
       </div>
@@ -634,7 +648,7 @@ export function ReceiptRoll({ me }: { me: Me }) {
           ledger
         </button>
         <button role="tab" aria-selected={view === "slips"} onClick={() => setView("slips")}>
-          slips{pending ? ` · ${pending}` : ""}
+          slips{pending ? ` (${pending})` : ""}
         </button>
       </div>
       <hr className={s.rule} />
@@ -773,9 +787,9 @@ export function SeasonMachine({ info, warming }: { info?: SeasonInfo; warming?: 
     <section className={s.velvet} aria-labelledby="season-title">
       <div className={s.panelHead}>
         <h2 id="season-title" className={s.panelTitle}>
-          season <em>{n}</em>
+          season {n}
         </h2>
-        <span className={cx(s.caps, s.mute)}>{info ? `${fmt(info.simps)} simps earning` : warming ? "warming up" : "—"}</span>
+        <span className="t-label">{info ? `${fmt(info.simps)} simps earning` : warming ? "warming up" : "—"}</span>
       </div>
       <div className={s.dialWrap}>
         <Dial progress={progress} />
@@ -784,7 +798,7 @@ export function SeasonMachine({ info, warming }: { info?: SeasonInfo; warming?: 
         </div>
       </div>
       <div className={s.onTable}>
-        <span className={s.caps + " " + s.mute}>on the table this season</span>
+        <span className={s.tag}>on the table this season</span>
         <span className={s.onTableNum}>{fmt(total)}</span>
       </div>
       <ul className={s.rack}>
@@ -808,7 +822,7 @@ export function SeasonMachine({ info, warming }: { info?: SeasonInfo; warming?: 
               <div>
                 <div className={s.rackName}>{POOL_LABEL[p.pool]}</div>
                 <div className={s.rackMeta}>
-                  {share}% ·{" "}
+                  {share}%,{" "}
                   {closed ? "opens when the card is confirmed" : p.emitted >= 0 ? `${fmt(p.emitted)} paid out` : "paid out: —"}
                 </div>
               </div>
@@ -845,8 +859,8 @@ export function Board({ me, myRank, warming }: { me?: string | null; myRank?: Me
   return (
     <section className={s.board} aria-labelledby="board-title">
       <div className={s.boardTitle}>
-        <span className={s.label} id="board-title">
-          top simps · season {lb.data?.season ?? Math.max(1, seasonAt())}
+        <span className="plate" id="board-title">
+          top simps, season {lb.data?.season ?? Math.max(1, seasonAt())}
         </span>
       </div>
       {warming ? (
@@ -899,8 +913,8 @@ export function Paytable() {
   const n = Math.max(1, seasonAt());
   const r = POINTS_CONFIG.rewards;
   const rows: { k: string; n: string; v: string; off?: boolean }[] = [
-    { k: "daily ticket", n: "holders, once per utc day", v: `${fmt(checkinReward(n, 1))} → ${fmt(checkinReward(n, 99))}` },
-    { k: "x post", n: `about simp cult · ${r.xPost.dailyCap} a day`, v: fmt(scaledReward(r.xPost.reward, n)) },
+    { k: "daily ticket", n: "holders, once per utc day", v: `${fmt(checkinReward(n, 1))} to ${fmt(checkinReward(n, 99))}` },
+    { k: "x post", n: `about simp cult, ${r.xPost.dailyCap} a day`, v: fmt(scaledReward(r.xPost.reward, n)) },
     { k: "alpha", n: "a human reviews it", v: `up to ${fmt(scaledReward(r.alpha.max, n))}` },
     { k: "holding", n: "per simp, per day, automatic", v: fmt(holdingRatePerNftPerDay(n)) },
     {
@@ -916,7 +930,7 @@ export function Paytable() {
       <h2 id="pay-title" className={s.payTitle}>
         how the machine pays
       </h2>
-      <p className={s.caps} style={{ textAlign: "center", marginTop: 6, color: "rgba(43,19,32,.6)" }}>
+      <p className={s.tag} style={{ textAlign: "center", marginTop: 6, color: "rgba(43,19,32,.62)" }}>
         season {n} rates
       </p>
       <ul className={s.payRows}>
@@ -950,7 +964,7 @@ export function Paytable() {
 export function WarmingUp() {
   return (
     <section className={cx(s.velvet, s.out)} aria-live="polite">
-      <span className={s.label}>notice</span>
+      <span className="plate">notice</span>
       <p className={s.tube}>the machine is warming up</p>
       <p className={s.outText}>
         the points desk isn&apos;t plugged in yet, so tickets and slips are closed for a moment. nothing&apos;s lost and
@@ -964,7 +978,7 @@ export function Printing({ label = "printing your ticket" }: { label?: string })
   return (
     <div className={s.rowA} aria-busy="true" aria-live="polite">
       <section className={s.plaque} style={{ minHeight: 260 }}>
-        <span className={s.label}>your stack</span>
+        <span className="plate">your stack</span>
         <p className={cx(s.bignum, s.bignumBlank)}>…</p>
       </section>
       <div className={cx(s.paper, s.printing)}>
@@ -985,7 +999,7 @@ export function Jammed({ message, onRetry }: { message: string; onRetry: () => v
       </p>
       <p className={s.ticketNote}>{message}</p>
       <div>
-        <button className={s.brass} onClick={onRetry}>
+        <button className="btn btn-ghost btn-on-paper" onClick={onRetry}>
           try again
         </button>
       </div>

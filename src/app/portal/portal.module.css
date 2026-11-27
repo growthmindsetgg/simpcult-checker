@@ -36,10 +36,6 @@
   display: grid;
   gap: clamp(28px, 4vw, 44px);
 }
-.desk :focus-visible {
-  outline: 2px solid var(--d-gold-hi);
-  outline-offset: 3px;
-}
 
 /* ── type ─────────────────────────────────────────────────────── */
 .serif {
@@ -49,11 +45,14 @@
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-.caps {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+/* a small label on velvet ("season 1", "on the table this season"): brass italic, sentence case */
+.tag {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--d-gold);
 }
 .dim {
   color: var(--d-dim);
@@ -90,38 +89,12 @@
   letter-spacing: -0.035em;
   color: var(--d-text);
 }
-.mastTitle em {
-  font-style: italic;
-  font-weight: 400;
-  color: var(--d-gold-hi);
-}
 .mastLead {
   max-width: 34rem;
   margin: 16px 0 0;
   font-size: 16px;
   line-height: 1.55;
   color: var(--d-dim);
-}
-
-/* small engraved brass label plate */
-.label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px 3px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #3a2408;
-  text-shadow: 0 1px 0 rgba(255, 238, 196, 0.55);
-  background: linear-gradient(180deg, var(--d-gold-hi), var(--d-gold) 48%, #b48632 52%, var(--d-gold-lo));
-  border-radius: 2px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .clock {
@@ -196,10 +169,6 @@
   font-size: clamp(26px, 2.6vw, 34px);
   line-height: 1.05;
   letter-spacing: -0.02em;
-}
-.panelTitle em {
-  font-style: italic;
-  color: var(--d-gold-hi);
 }
 
 /* ── brass plaque (balance) ───────────────────────────────────── */
@@ -286,12 +255,12 @@
   box-shadow: inset 1px 0 0 rgba(217, 168, 69, 0.16);
 }
 .engravedK {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--d-gold-lo);
-  text-shadow: 0 1px 0 rgba(246, 220, 149, 0.12);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  color: rgba(217, 168, 69, 0.78);
 }
 .engravedV {
   margin-top: 6px;
@@ -367,9 +336,7 @@
   justify-content: space-between;
   gap: 10px;
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-size: 11.5px;
   color: rgba(43, 19, 32, 0.72);
 }
 .admit {
@@ -421,8 +388,7 @@
 .holesKey {
   margin-top: 8px;
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
   color: rgba(43, 19, 32, 0.62);
 }
 
@@ -489,96 +455,36 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── buttons: one neon, the rest brass ───────────────────────── */
-.neon,
-.brass,
+/* ── buttons: the global deck keys (.btn-primary lit, .btn-ghost unlit,
+   + .btn-on-paper on cream stock). only the quiet text link lives here. ── */
 .textBtn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  min-height: 46px;
-  padding: 0 24px;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: lowercase;
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    transform 160ms var(--ease),
-    box-shadow 200ms var(--ease),
-    border-color 200ms var(--ease),
-    color 200ms var(--ease),
-    opacity 200ms var(--ease);
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.neon {
-  color: #22020f;
-  border: 0;
-  background: linear-gradient(180deg, #ff6cc2, var(--d-neon) 60%, #e62a96);
-  box-shadow:
-    0 0 0 1px var(--d-neon-hot),
-    0 0 18px rgba(255, 63, 174, 0.55),
-    0 0 46px rgba(255, 63, 174, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-.brass {
-  color: var(--d-gold-hi);
-  border: 1px solid var(--d-gold-lo);
-  background: rgba(10, 6, 16, 0.35);
-  box-shadow: inset 0 0 0 1px rgba(246, 220, 149, 0.1);
-}
-.paper .brass {
-  color: var(--d-paper-ink);
-  border-color: rgba(43, 19, 32, 0.55);
-  background: transparent;
-  box-shadow: none;
-}
-.textBtn {
   min-height: 36px;
-  padding: 0 4px;
+  padding: 0 2px 2px;
   border: 0;
-  border-radius: 0;
   background: none;
-  color: var(--d-gold);
+  color: var(--d-gold-hi);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
   font-weight: 500;
   text-decoration: underline;
   text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
   text-underline-offset: 4px;
+  cursor: pointer;
+  transition: color 160ms ease;
 }
-@media (hover: hover) {
-  .neon:hover {
-    box-shadow:
-      0 0 0 1px var(--d-neon-hot),
-      0 0 24px rgba(255, 63, 174, 0.75),
-      0 0 64px rgba(255, 63, 174, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  }
-  .brass:hover {
-    border-color: var(--d-gold);
-    color: #fff3cf;
-  }
-  .paper .brass:hover {
-    border-color: var(--d-paper-ink);
-    color: var(--d-paper-ink);
-  }
+@media (hover: hover) and (pointer: fine) {
   .textBtn:hover {
-    color: var(--d-gold-hi);
+    color: #fff6df;
   }
 }
-.neon:active,
-.brass:active {
-  transform: scale(0.97);
-}
-.neon:disabled,
-.brass:disabled,
 .textBtn:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
-  transform: none;
+  opacity: 0.5;
 }
 .wide {
   width: 100%;
@@ -605,12 +511,12 @@
 }
 .tab {
   position: relative;
-  padding: 9px 16px 8px;
-  font-family: var(--mono);
-  font-size: 11.5px;
+  padding: 8px 16px 9px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  line-height: 1;
   color: rgba(43, 19, 32, 0.7);
   background: var(--d-paper-2);
   border: 0;
@@ -644,11 +550,11 @@
   gap: 6px;
 }
 .slipLabel {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(43, 19, 32, 0.66);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: rgba(43, 19, 32, 0.7);
 }
 .field {
   width: 100%;
@@ -703,11 +609,12 @@ textarea.field {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px;
-  font-size: 10.5px;
+  padding: 0 8px 2px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  line-height: 1.2;
   color: #1d5b40;
   border: 1.5px solid currentColor;
   border-radius: 4px;
@@ -834,9 +741,7 @@ textarea.field {
   min-height: 32px;
   padding: 0 10px;
   font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 12px;
   color: rgba(43, 19, 32, 0.6);
   background: none;
   border: 0;
@@ -908,8 +813,6 @@ textarea.field {
   justify-content: space-between;
   gap: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 .empty {
   padding: 14px 0;
@@ -930,10 +833,9 @@ textarea.field {
 }
 .dialLabel {
   margin-top: -6px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
   color: var(--d-gold);
 }
 .onTable {
@@ -1011,9 +913,10 @@ textarea.field {
 }
 .rackAmt small {
   display: block;
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--d-mute);
 }
 .next {
@@ -1090,10 +993,10 @@ textarea.field {
   transform: translateY(-4px);
 }
 .boardYou {
-  margin-left: 6px;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  margin-left: 8px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
   color: var(--d-gold-hi);
 }
 .boardEmpty {
@@ -1221,9 +1124,7 @@ textarea.field {
   gap: 10px;
   padding: 26px;
   font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 12.5px;
 }
 .printingLine {
   height: 9px;
@@ -1290,12 +1191,10 @@ textarea.field {
   padding: 18px 20px 20px;
 }
 .flag {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 2px 7px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 7px 2px;
   border: 1.5px solid currentColor;
 }
 .flag[data-tone="bad"] {
@@ -1316,6 +1215,8 @@ textarea.field {
   padding-right: 24px;
 }
 .rejectBtn {
+  --legend: var(--d-red);
+  --legend-hover: #8c1a2e;
   color: var(--d-red);
 }
 
@@ -1332,8 +1233,7 @@ textarea.field {
     padding: 18px 14px 16px 22px;
   }
   .ticketHead {
-    letter-spacing: 0.08em;
-    font-size: 10px;
+    font-size: 11px;
   }
   .holes {
     gap: 5px;
@@ -1348,10 +1248,6 @@ textarea.field {
   }
   .stampBig {
     font-size: 17px;
-  }
-  .engravedK {
-    font-size: 9.5px;
-    letter-spacing: 0.08em;
   }
   .engraved > div + div {
     padding-left: 10px;

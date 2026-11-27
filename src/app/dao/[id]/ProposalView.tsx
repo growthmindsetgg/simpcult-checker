@@ -14,11 +14,32 @@ import { Icon } from "@/components/Icon";
 import { Reveal } from "@/components/motion";
 import { toast } from "@/components/Toast";
 
+/* each choice is an unlit deck key with a coloured legend. the one you picked
+   latches: it stays down, backlit in its own colour, even once voting locks. */
 const CHOICES = [
-  { v: 1, label: "for", cls: "border-ok/50 text-ok hover:bg-ok/10" },
-  { v: 0, label: "against", cls: "border-bad/50 text-bad hover:bg-bad/10" },
-  { v: 2, label: "abstain", cls: "border-line text-dim hover:bg-white/5" },
+  { v: 1, label: "for", tone: "var(--ok)", rgb: "127 224 176" },
+  { v: 0, label: "against", tone: "var(--bad)", rgb: "255 122 92" },
+  { v: 2, label: "abstain", tone: "var(--gold-hi)", rgb: "217 168 69" },
 ] as const;
+
+function latched(rgb: string, tone: string): React.CSSProperties {
+  // mixed toward a neutral black, not the plum insert: green over plum goes grey
+  const lit = `linear-gradient(180deg, color-mix(in oklab, rgb(${rgb}) 34%, #0b0709), color-mix(in oklab, rgb(${rgb}) 16%, #0b0709))`;
+  // the tint rides on the backlight layer (::before): --insert must stay a single
+  // layer, or the extra one would paint over the brass bezel
+  return {
+    "--insert": "var(--key-insert-unlit)",
+    "--insert-hover": lit,
+    "--key-glow": 1,
+    "--bezel": "var(--key-bezel)",
+    "--legend": tone,
+    "--legend-hover": tone,
+    "--skirt": "var(--key-skirt)",
+    "--key-hi": `rgb(${rgb} / 0.3)`,
+    "--key-press": 1,
+    "--_spill": `0 0 18px -6px rgb(${rgb} / 0.55)`,
+  } as React.CSSProperties;
+}
 
 export function ProposalView({ id }: { id: number }) {
   const cfg = useDaoConfig();
@@ -34,7 +55,7 @@ export function ProposalView({ id }: { id: number }) {
   const s = deriveState(p, quorum);
   return (
     <Wrap>
-      <Link href="/dao" className="link text-[13px]">← all proposals</Link>
+      <Link href="/dao" className="link text-[13px]">all proposals</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs text-mute">
@@ -46,7 +67,8 @@ export function ProposalView({ id }: { id: number }) {
       </div>
 
       <div className="mt-2 text-xs text-mute">
-        {fmtDate(p.start)} → {fmtDate(p.end)} {s === "active" && <b className="text-simp-2">· {timeLeft(p.end)}</b>}
+        {fmtDate(p.start)} to {fmtDate(p.end)}
+        {s === "active" && <b className="text-simp-2">, {timeLeft(p.end)}</b>}
       </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-[1fr_340px]">
@@ -58,10 +80,7 @@ export function ProposalView({ id }: { id: number }) {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="t-h3 text-[15px]">results</h3>
               {pendingHash && (
-                <span className="pill pill-warn">
-                  <Icon name="spinner" className="h-3 w-3" />
-                  pending
-                </span>
+                <span className="pill pill-warn">pending</span>
               )}
             </div>
             <VoteBars p={p} quorum={quorum} pendingChoice={pendingChoice} />
@@ -192,15 +211,26 @@ function VotePanel({
             {CHOICES.map((c) => {
               const disabled = !canVote || busy !== null || (myChoice !== null && myChoice !== c.v);
               const isBusy = busy === c.v;
+              const picked = myChoice === c.v || pendingChoice === c.v;
               return (
                 <button
                   key={c.v}
                   disabled={disabled}
                   onClick={() => vote(c.v as 0 | 1 | 2)}
-                  className={`btn w-full border ${c.cls} ${myChoice === c.v || pendingChoice === c.v ? "bg-white/5" : ""}`}
+                  className="btn btn-ghost w-full"
+                  style={picked ? latched(c.rgb, c.tone) : disabled ? undefined : ({ "--legend": c.tone } as React.CSSProperties)}
                   aria-label={`vote ${c.label}`}
+                  aria-pressed={picked}
+                  aria-busy={isBusy}
                 >
-                  {isBusy ? <Icon name="spinner" /> : <>{c.label} {free.length > 0 && `· ${free.length}`}</>}
+                  {isBusy ? (
+                    <Icon name="spinner" />
+                  ) : (
+                    <>
+                      {c.label}
+                      {free.length > 0 && <span className="mono opacity-70">{free.length}</span>}
+                    </>
+                  )}
                 </button>
               );
             })}
@@ -216,7 +246,7 @@ function VotePanel({
 
       {pendingHash && (
         <a className="link mt-3 block text-xs" href={explorerTx(pendingHash)} target="_blank" rel="noreferrer">
-          view transaction ↗
+          view transaction
         </a>
       )}
       {err && <p className="mt-3 text-xs text-bad">{err}</p>}

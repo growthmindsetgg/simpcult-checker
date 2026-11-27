@@ -13,7 +13,7 @@ export default function SlotPage() {
       <h1 className="sr-only">simp machine</h1>
       <nav className="absolute left-[var(--gutter)] top-[88px] z-20 text-[13px] sm:top-[104px]" aria-label="breadcrumb">
         <Link href="/games" className="link">
-          ← all games
+          all games
         </Link>
       </nav>
       <SlotGame />
