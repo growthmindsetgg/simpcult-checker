@@ -194,6 +194,13 @@ body::after {
   background-image: var(--noise);
   opacity: 0.22;
 }
+/* Chrome drops Bodoni Moda's hairlines on big glyphs (2x screens) when opsz goes above
+   roughly 30, so "let's" reads "lct's". Headings cap it at 24; classes that pin their own
+   opsz still win. */
+h1,
+h2 {
+  font-variation-settings: "opsz" 24;
+}
 ::selection {
   background: var(--neon);
   color: var(--ink);
