@@ -1,23 +1,30 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { JoinFlow } from "./JoinFlow";
 import { PageHeader } from "@/components/PageHeader";
 
-export const metadata: Metadata = { title: "join the holders' chat" };
+export const metadata: Metadata = {
+  title: "join",
+  description: "verify your wallet to earn simp points. sign with a connected wallet, or send a 0-MON transaction to yourself.",
+};
 
 export default function JoinPage() {
   return (
     <section className="page max-w-3xl">
       <PageHeader
-        eyebrow="holders only"
-        title="join the holders' chat"
+        eyebrow="Verify your wallet"
+        title="Join the cult"
         lead={
           <>
-            the telegram group is for simp cult nft holders. prove you hold one and get a single-use invite. sell your simp and
-            the bot shows you out. verify again whenever you&apos;re back.
+            Prove a wallet is yours to start earning points. Sign a message with a connected wallet, or send a 0-MON
+            transaction to yourself from any wallet app. Telegram is optional: it gets you 3x points.
           </>
         }
       />
-      <JoinFlow />
+      {/* the flow reads ?via= from the URL, so it renders on the client */}
+      <Suspense fallback={<div className="mt-12 h-64" aria-hidden />}>
+        <JoinFlow />
+      </Suspense>
     </section>
   );
 }

@@ -1,56 +1,72 @@
-import { NextResponse } from "next/server";
 import { parseSiweMessage, verifySiweMessage } from "viem/siwe";
-import { getAddress, isHex } from "viem";
+import { getAddress, isAddress, isHex } from "viem";
 import { consumeNonce } from "@/lib/server/nonce";
 import { clientIp, rateLimit } from "@/lib/server/ratelimit";
 import { publicClient, nftBalance } from "@/lib/server/chain";
 import { setSessionCookie } from "@/lib/server/session";
+import { crossSite, fail, guard, json, tooMany } from "@/lib/server/http";
 import { CHAIN_ID, SITE } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+
+const MAX_MESSAGE = 2_000;
+const MAX_SIGNATURE = 20_000; // ERC-6492 wrapped signatures can be long
 
 /**
  * Sign-In With Ethereum (EIP-4361) verification.
  * Checks: signature (EOA, ERC-1271 smart wallets, ERC-6492), domain binding,
  * chain id 143, nonce is ours + unused + unexpired + issued to this browser,
- * message not expired.
+ * message not expired / not yet valid.
  */
-export async function POST(req: Request) {
-  if (!(await rateLimit("verify", clientIp(req), 10, 60))) {
-    return NextResponse.json({ error: "too many attempts — wait a minute" }, { status: 429, headers: { "retry-after": "60" } });
-  }
-  const body = (await req.json().catch(() => null)) as
-    | { message?: string; signature?: string }
-    | null;
-  if (!body?.message || !isHex(body.signature ?? "")) {
-    return NextResponse.json({ error: "bad request" }, { status: 400 });
+export const POST = guard(async (req: Request) => {
+  if (crossSite(req)) return fail(403, "cross-site request refused");
+  if (!(await rateLimit("verify", clientIp(req), 10, 60))) return tooMany();
+  const body = (await req.json().catch(() => null)) as { message?: unknown; signature?: unknown } | null;
+  const message = body?.message;
+  const signature = body?.signature;
+  if (
+    typeof message !== "string" ||
+    message.length > MAX_MESSAGE ||
+    typeof signature !== "string" ||
+    signature.length > MAX_SIGNATURE ||
+    !isHex(signature)
+  ) {
+    return fail(400, "bad request");
   }
 
-  const parsed = parseSiweMessage(body.message);
-  if (!parsed.address || !parsed.nonce) {
-    return NextResponse.json({ error: "malformed siwe message" }, { status: 400 });
+  let parsed: ReturnType<typeof parseSiweMessage>;
+  try {
+    parsed = parseSiweMessage(message);
+  } catch {
+    return fail(400, "that sign-in message is malformed");
   }
-  if (parsed.chainId !== CHAIN_ID) {
-    return NextResponse.json({ error: "wrong chain — monad (143) only" }, { status: 400 });
+  if (!parsed.address || !isAddress(parsed.address, { strict: false }) || !parsed.nonce) {
+    return fail(400, "that sign-in message is malformed");
   }
+  if (parsed.chainId !== CHAIN_ID) return fail(400, `wrong network. sign in on monad (chain ${CHAIN_ID}).`);
+  if (parsed.domain !== SITE.domain) return fail(400, `this message was made for ${parsed.domain}, not ${SITE.domain}`);
 
   // consume nonce (single use, bound to this browser's nonce cookie)
   if (!(await consumeNonce(parsed.nonce))) {
-    return NextResponse.json({ error: "nonce expired or already used — try again" }, { status: 401 });
+    return fail(401, "that sign-in code expired or was already used. try again.");
   }
 
-  const ok = await verifySiweMessage(publicClient, {
-    message: body.message,
-    signature: body.signature as `0x${string}`,
-    domain: SITE.domain,
-    nonce: parsed.nonce,
-  });
-  if (!ok) {
-    return NextResponse.json({ error: "signature invalid" }, { status: 401 });
+  let ok = false;
+  try {
+    ok = await verifySiweMessage(publicClient, {
+      message,
+      signature,
+      domain: SITE.domain,
+      nonce: parsed.nonce,
+    });
+  } catch (e) {
+    console.error("[auth/verify] verifySiweMessage", (e as Error).message);
+    return fail(502, "couldn’t check the signature on monad right now. try again.");
   }
+  if (!ok) return fail(401, "that signature doesn’t match this wallet");
 
   const address = getAddress(parsed.address);
   const balance = await nftBalance(address).catch(() => 0);
   await setSessionCookie({ address, method: "siwe", balance });
-  return NextResponse.json({ address, balance, method: "siwe" });
-}
+  return json({ address, balance, method: "siwe" });
+});

@@ -23,6 +23,17 @@ export const wagmiConfig = createConfig({
           walletConnect({
             projectId: wcProjectId,
             showQrModal: true,
+            // the provider maps these --wcm-* keys to AppKit's --w3m-* ones. a custom
+            // font family stops AppKit preloading fonts.reown.com (blocked by our CSP)
+            qrModalOptions: {
+              themeMode: "dark",
+              themeVariables: {
+                "--wcm-font-family": "var(--font-inter), system-ui, sans-serif",
+                "--wcm-accent-color": "#6E54FF",
+                "--wcm-z-index": "1000",
+                "--wcm-container-border-radius": "8px",
+              },
+            },
             metadata: {
               name: "simp cult",
               description: "simp cult — monad nft collection & dao",

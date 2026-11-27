@@ -5,6 +5,7 @@ import type { Address } from "viem";
 
 export const SESSION_COOKIE = "simp_session";
 const SESSION_TTL_SEC = 60 * 60 * 24 * 7; // 7 days
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export type Session = {
   address: Address;
@@ -38,8 +39,9 @@ export function encodeSession(s: Omit<Session, "iat" | "exp">): string {
 
 export function decodeSession(token?: string | null): Session | null {
   if (!token) return null;
-  const [payload, sig] = token.split(".");
-  if (!payload || !sig) return null;
+  if (token.length > 2048) return null;
+  const [payload, sig, extra] = token.split(".");
+  if (!payload || !sig || extra !== undefined) return null;
   let expect: string;
   try {
     expect = sign(payload);
@@ -51,7 +53,17 @@ export function decodeSession(token?: string | null): Session | null {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
     const s = JSON.parse(Buffer.from(payload, "base64url").toString()) as Session;
-    if (s.exp < Math.floor(Date.now() / 1000)) return null;
+    // the HMAC already vouches for the payload; this only refuses shapes no
+    // version of encodeSession ever produced
+    if (
+      !s ||
+      typeof s.address !== "string" ||
+      !ADDRESS_RE.test(s.address) ||
+      (s.method !== "siwe" && s.method !== "tx") ||
+      typeof s.exp !== "number" ||
+      s.exp < Math.floor(Date.now() / 1000)
+    )
+      return null;
     return s;
   } catch {
     return null;
@@ -71,7 +83,14 @@ export async function setSessionCookie(s: Omit<Session, "iat" | "exp">) {
 
 export async function clearSessionCookie() {
   const c = await cookies();
-  c.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+  // same attributes as when it was set, so every browser matches and drops it
+  c.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export async function getSession(): Promise<Session | null> {

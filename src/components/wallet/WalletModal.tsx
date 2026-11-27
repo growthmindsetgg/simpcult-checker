@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAccount, useConnect, useConnectors, useDisconnect, useSwitchChain } from "wagmi";
 import { motion } from "motion/react";
 import { CHAIN, CHAIN_ID, short, explorerAddress, LINKS } from "@/lib/config";
-import { useSession, useVerifyBySignature, useVerifyByTransaction, useLogout } from "@/lib/useSession";
+import { useSession, useVerifyBySignature, useVerifyByTransaction, useLogout, humanError } from "@/lib/useSession";
 import { Icon } from "../Icon";
 import { ModalShell } from "../motion";
 import { toast } from "../Toast";
@@ -21,21 +21,37 @@ export function WalletModal({ open, onClose }: { open: boolean; onClose: () => v
 function Body({ onClose }: { onClose: () => void }) {
   const { address, isConnected, chainId, connector } = useAccount();
   const { session } = useSession();
-  const step = !isConnected || !address ? 1 : chainId !== CHAIN_ID ? 1 : session ? 3 : 2;
+  const [connecting, setConnecting] = useState(false);
 
+  // verified by self-transaction with no wallet connected here ("send and set")
+  if ((!isConnected || !address) && session && !connecting) {
+    return (
+      <>
+        <StepIndicator step={3} />
+        <Verify address={session.address} connectorName="no wallet connected" onClose={onClose} onConnect={() => setConnecting(true)} />
+      </>
+    );
+  }
+
+  const step = !isConnected || !address ? 1 : chainId !== CHAIN_ID ? 1 : session ? 3 : 2;
   return (
     <>
       <StepIndicator step={step} />
-      {step === 1 && (!isConnected || !address ? <Connect /> : <WrongChain />)}
+      {step === 1 && (!isConnected || !address ? <Connect onClose={onClose} /> : <WrongChain />)}
       {step >= 2 && address && (
-        <Verify address={address} connectorName={connector ? connectorLabel(connector.id, connector.name) : undefined} onClose={onClose} />
+        <Verify
+          address={address}
+          connectorName={connector ? connectorLabel(connector.id, connector.name, connector.type) : undefined}
+          onClose={onClose}
+        />
       )}
     </>
   );
 }
 
 /* "Injected" is wagmi's word, not a person's: name it for what it is */
-function connectorLabel(id: string, name: string) {
+function connectorLabel(id: string, name: string, type?: string) {
+  if (type === "walletConnect") return "walletconnect";
   return id === "injected" ? "browser wallet" : name.toLowerCase();
 }
 
@@ -43,67 +59,85 @@ function connectorLabel(id: string, name: string) {
 function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
   const labels = ["connect", "verify"];
   return (
-    <div className="mb-6 flex items-center gap-2 font-serif text-[15px] italic text-mute">
+    <ol className="mb-6 flex items-center gap-2 font-serif text-[15px] italic text-mute" aria-label="progress">
       {labels.map((label, i) => {
         const idx = (i + 1) as 1 | 2;
         const active = step === idx;
         const done = step > idx;
         return (
-          <div key={label} className="flex items-center gap-2">
+          <li key={label} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
             <span
               className={`mono grid h-6 w-6 place-items-center rounded-full not-italic text-[11px] font-semibold transition-colors ${
                 done ? "bg-ok/15 text-ok ring-1 ring-ok/40" : active ? "bg-gold text-ink" : "text-mute ring-1 ring-line-strong"
               }`}
-              aria-current={active ? "step" : undefined}
+              aria-hidden
             >
               {done ? <Icon name="check" className="h-3 w-3" /> : idx}
             </span>
-            <span className={done || active ? "text-text" : ""}>{label}</span>
-            {i < labels.length - 1 && (
-              <span className="mx-1 h-px w-8 bg-line-strong" aria-hidden />
-            )}
-          </div>
+            <span className={done || active ? "text-text" : ""}>
+              {label}
+              {done && <span className="sr-only"> (done)</span>}
+            </span>
+            {i < labels.length - 1 && <span className="mx-1 h-px w-8 bg-line-strong" aria-hidden />}
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
 /* ── step 1: pick a wallet ─────────────────────────────────── */
-function Connect() {
+const WC_MISSING = /dynamically imported module|cannot find module|ethereum-provider|is not a function/i;
+
+function Connect({ onClose }: { onClose: () => void }) {
   const connectors = useConnectors();
-  const { connectAsync, isPending, variables, error } = useConnect();
+  const { connectAsync, isPending, variables } = useConnect();
   const [err, setErr] = useState<string | null>(null);
 
-  const list = connectors.filter(
-    (c) => !(c.id === "injected" && connectors.some((o) => o.type === "injected" && o.id !== "injected")),
+  // the generic "injected" entry only when no EIP-6963 wallet announced itself
+  const injected = connectors.filter(
+    (c) => c.type === "injected" && !(c.id === "injected" && connectors.some((o) => o.type === "injected" && o.id !== "injected")),
   );
+  // present only when NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set (src/lib/wagmi.ts)
+  const wc = connectors.find((c) => c.type === "walletConnect");
+
+  async function connect(c: (typeof connectors)[number]) {
+    setErr(null);
+    if (c.type === "walletConnect") {
+      // the QR modal is its own dialog: close ours first so the two never fight
+      // over focus, Escape or scroll lock. results come back as toasts.
+      onClose();
+      try {
+        await connectAsync({ connector: c, chainId: CHAIN_ID });
+        toast.ok("wallet connected", "sign in to finish verifying");
+      } catch (e) {
+        const msg = humanError(e);
+        if (/cancelled|closed|rejected|request reset/i.test(msg)) return; // they shut the QR modal
+        toast.bad(
+          "walletconnect didn’t connect",
+          WC_MISSING.test(msg) ? "it isn’t available right now. use a browser wallet, or verify by sending a transaction." : msg,
+        );
+      }
+      return;
+    }
+    try {
+      await connectAsync({ connector: c, chainId: CHAIN_ID });
+    } catch (e) {
+      setErr(humanError(e));
+    }
+  }
+
+  const row =
+    "glass glass-hover flex w-full items-center gap-3 px-4 py-3.5 text-left disabled:cursor-not-allowed disabled:opacity-60";
+  const pendingOn = (c: (typeof connectors)[number]) => isPending && variables?.connector === c;
 
   return (
     <>
       <Header title="connect wallet" sub="monad mainnet only. no approvals, ever." />
       <div className="mt-6 space-y-2.5">
-        {list.length === 0 && (
-          <p className="text-sm text-dim">
-            no wallet found in this browser. install a wallet extension, or set{" "}
-            <span className="mono">NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</span> to enable walletconnect.
-          </p>
-        )}
-        {list.map((c) => (
-          <button
-            key={c.uid}
-            disabled={isPending}
-            onClick={async () => {
-              setErr(null);
-              try {
-                await connectAsync({ connector: c, chainId: CHAIN_ID });
-              } catch (e) {
-                setErr((e as Error).message.split("\n")[0]);
-              }
-            }}
-            className="glass glass-hover flex w-full items-center gap-3 px-4 py-3.5 text-left"
-            aria-label={`connect with ${connectorLabel(c.id, c.name)}`}
-          >
+        {injected.length === 0 && <p className="text-sm text-dim">no browser wallet found here.</p>}
+        {injected.map((c) => (
+          <button key={c.uid} type="button" disabled={isPending} aria-busy={pendingOn(c)} onClick={() => connect(c)} className={row}>
             {c.icon ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={c.icon} alt="" className="h-7 w-7 rounded-md" />
@@ -112,16 +146,39 @@ function Connect() {
                 <Icon name="wallet" className="h-5 w-5 text-gold" />
               </span>
             )}
-            <span className="flex-1 text-[15px] font-medium text-text">{connectorLabel(c.id, c.name)}</span>
-            {isPending && variables?.connector === c ? (
+            <span className="flex-1 text-[15px] font-medium text-text">{connectorLabel(c.id, c.name, c.type)}</span>
+            {pendingOn(c) ? (
               <Icon name="spinner" className="h-4 w-4 text-gold" />
             ) : (
-              <span className="mono text-[11.5px] text-mute">{c.type === "walletConnect" ? "qr / mobile" : "extension"}</span>
+              <span className="mono text-[11.5px] text-mute">extension</span>
             )}
           </button>
         ))}
+        {wc && (
+          <button type="button" disabled={isPending} aria-busy={pendingOn(wc)} onClick={() => connect(wc)} className={row}>
+            <span className="grid h-7 w-7 place-items-center" aria-hidden>
+              <Icon name="wallet" className="h-5 w-5 text-gold" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[15px] font-medium text-text">scan with phone</span>
+              <span className="block text-[12px] text-mute">walletconnect · mobile wallets / qr code</span>
+            </span>
+            {pendingOn(wc) ? <Icon name="spinner" className="h-4 w-4 text-gold" /> : <span className="mono text-[11.5px] text-mute">qr</span>}
+          </button>
+        )}
       </div>
-      {(err || error) && <p className="mt-3 text-xs text-bad">{err ?? error?.message.split("\n")[0]}</p>}
+      {err && (
+        <p role="alert" className="mt-3 text-xs text-bad">
+          {err}
+        </p>
+      )}
+      <p className="mt-5 text-[13px] leading-relaxed text-dim">
+        rather not connect?{" "}
+        <Link href="/join?via=send" onClick={onClose} className="link">
+          verify by sending a transaction
+        </Link>{" "}
+        from any wallet app instead.
+      </p>
       <SecurityNote />
     </>
   );
@@ -135,20 +192,41 @@ function WrongChain() {
     <>
       <Header title="switch to monad" sub={`this site only works on ${CHAIN.name} (chain id ${CHAIN_ID}).`} />
       <div className="mt-5 flex gap-2">
-        <button className="btn btn-primary flex-1" disabled={isPending} onClick={() => switchChainAsync({ chainId: CHAIN_ID })}>
+        <button
+          type="button"
+          className="btn btn-primary flex-1"
+          disabled={isPending}
+          aria-busy={isPending}
+          onClick={() => switchChainAsync({ chainId: CHAIN_ID }).catch(() => {})}
+        >
           {isPending ? <Icon name="spinner" /> : "switch network"}
         </button>
-        <button className="btn btn-ghost" onClick={() => disconnect()} aria-label="disconnect wallet">
+        <button type="button" className="btn btn-ghost" onClick={() => disconnect()}>
           disconnect
         </button>
       </div>
-      {error && <p className="mt-3 text-xs text-bad">{error.message.split("\n")[0]}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-xs text-bad">
+          {humanError(error)}
+        </p>
+      )}
     </>
   );
 }
 
 /* ── step 2/3: verify + verified ───────────────────────────── */
-function Verify({ address, connectorName, onClose }: { address: `0x${string}`; connectorName?: string; onClose: () => void }) {
+function Verify({
+  address,
+  connectorName,
+  onClose,
+  onConnect,
+}: {
+  address: `0x${string}`;
+  connectorName?: string;
+  onClose: () => void;
+  /** walletless session: offer to connect a wallet instead of "disconnect" */
+  onConnect?: () => void;
+}) {
   const { session, isHolder, isLoading } = useSession();
   const sig = useVerifyBySignature();
   const tx = useVerifyByTransaction();
@@ -156,7 +234,8 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
   const { disconnect } = useDisconnect();
   const [mode, setMode] = useState<"sig" | "tx">("sig");
   const busy = sig.isPending || tx.isPending;
-  const err = (sig.error ?? tx.error)?.message.split("\n")[0];
+  const anyErr = sig.error ?? tx.error;
+  const err = anyErr ? humanError(anyErr) : null;
 
   // toast once per session appearance (side effect on external store — no React state)
   const toastedFor = useRef<string | null>(null);
@@ -168,18 +247,15 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
     const key = `${session.address}:${session.method}`;
     if (toastedFor.current === key) return;
     toastedFor.current = key;
-    toast.ok(
-      "verified",
-      isHolder ? `holding ${session.balance} simp` : "wallet holds 0 simp — grab one on opensea",
-    );
+    toast.ok("verified", isHolder ? `holding ${session.balance} simp` : "wallet holds 0 simp");
   }, [session, isHolder]);
 
   return (
     <>
       <Header
-        title={session ? "verified" : "verify it's you"}
+        title={session ? "verified" : "verify it’s you"}
         sub={
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2">
             <span className="mono">{short(address)}</span>
             <a
               className="text-mute hover:text-white"
@@ -224,7 +300,7 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
             </motion.svg>
           </motion.div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className={`pill ${isHolder ? "pill-ok" : "pill-warn"}`}>
               {isHolder ? `holder · ${session.balance} simp` : "not a holder"}
             </span>
@@ -233,50 +309,87 @@ function Verify({ address, connectorName, onClose }: { address: `0x${string}`; c
           {!isHolder && (
             <p className="text-sm text-dim">
               this wallet holds no simp cult nft. grab one on{" "}
-              <a className="link" href={LINKS.opensea} target="_blank" rel="noreferrer">opensea</a>{" "}
-              or connect a different wallet.
+              <a className="link" href={LINKS.opensea} target="_blank" rel="noreferrer">
+                opensea
+              </a>{" "}
+              or use a different wallet.
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
-            <Link href="/dao" onClick={onClose} className="btn btn-primary">dao</Link>
-            <Link href="/join" onClick={onClose} className="btn btn-ghost">telegram</Link>
+            <Link href="/portal" onClick={onClose} className="btn btn-primary">
+              portal
+            </Link>
+            <Link href="/join" onClick={onClose} className="btn btn-ghost">
+              telegram 3x
+            </Link>
           </div>
           <div className="flex justify-between text-xs text-mute">
-            <button className="hover:text-white" onClick={() => logout.mutate()}>sign out</button>
-            <button className="hover:text-white" onClick={() => { logout.mutate(); disconnect(); }}>disconnect</button>
+            <button type="button" className="py-2 hover:text-white" onClick={() => logout.mutate()}>
+              sign out
+            </button>
+            {onConnect ? (
+              <button type="button" className="py-2 hover:text-white" onClick={onConnect}>
+                connect a wallet
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="py-2 hover:text-white"
+                onClick={() => {
+                  logout.mutate();
+                  disconnect();
+                }}
+              >
+                disconnect
+              </button>
+            )}
           </div>
         </div>
       ) : (
         <div className="mt-6 space-y-5">
-          <div className="segment w-full">
-            <button className="flex-1" data-active={mode === "sig"} onClick={() => setMode("sig")}>sign message (free)</button>
-            <button className="flex-1" data-active={mode === "tx"} onClick={() => setMode("tx")}>self-transaction</button>
+          <div className="segment w-full" role="group" aria-label="how to verify">
+            <button type="button" className="flex-1" data-active={mode === "sig"} aria-pressed={mode === "sig"} onClick={() => setMode("sig")}>
+              sign message (free)
+            </button>
+            <button type="button" className="flex-1" data-active={mode === "tx"} aria-pressed={mode === "tx"} onClick={() => setMode("tx")}>
+              self-transaction
+            </button>
           </div>
 
           {mode === "sig" ? (
             <p className="text-sm leading-relaxed text-dim">
-              you&apos;ll sign a plain-text message (sign-in with ethereum). it&apos;s not a transaction: no gas, and a
+              you&rsquo;ll sign a plain-text message (sign-in with ethereum). it&rsquo;s not a transaction: no gas, and a
               signature <em>cannot</em> move or approve any asset. the message names this domain, your address, the
               monad chain id and a one-time code that expires in 5 minutes.
             </p>
           ) : (
             <p className="text-sm leading-relaxed text-dim">
-              for wallets that can&apos;t sign messages: send <span className="text-text">0 MON from your address to your own
-              address</span> with a one-time code in the data field. only gas is spent. we check the mined transaction —
+              for wallets that can&rsquo;t sign messages: send <span className="text-text">0 MON from your address to your own
+              address</span> with a one-time code in the data field. only gas is spent. we check the mined transaction.
               nothing else touches your wallet.
             </p>
           )}
 
           <button
+            type="button"
             className="btn btn-primary w-full"
             disabled={busy || isLoading}
+            aria-busy={busy}
             onClick={() => (mode === "sig" ? sig.mutate() : tx.mutate())}
           >
             {busy ? <Icon name="spinner" /> : mode === "sig" ? "sign & verify" : "send self-tx & verify"}
           </button>
-          {tx.isPending && <p className="text-center text-xs text-mute">waiting for confirmation on monad…</p>}
-          {err && <p className="text-xs text-bad">{err}</p>}
-          <button className="w-full text-center text-xs text-mute hover:text-white" onClick={() => disconnect()}>
+          {tx.isPending && (
+            <p className="text-center text-xs text-mute" aria-live="polite">
+              waiting for confirmation on monad…
+            </p>
+          )}
+          {err && (
+            <p role="alert" className="text-xs text-bad">
+              {err}
+            </p>
+          )}
+          <button type="button" className="w-full py-2 text-center text-xs text-mute hover:text-white" onClick={() => disconnect()}>
             disconnect
           </button>
           <SecurityNote />
@@ -301,7 +414,7 @@ function SecurityNote() {
       <Icon name="shield" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
       <span>
         we never request token approvals. if a wallet prompt ever asks for <em>setApprovalForAll</em> or a
-        different chain, reject it — it isn&apos;t us. run a simulation extension like pocket universe for an extra
+        different chain, reject it. it isn&rsquo;t us. run a simulation extension like pocket universe for an extra
         layer.
       </span>
     </p>

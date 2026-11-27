@@ -28,6 +28,8 @@ export interface KV {
   del(key: string): Promise<void>;
   /** get-and-delete (atomic on Redis) — used to consume single-use nonces */
   take<T = string>(key: string): Promise<T | null>;
+  /** set only if the key is absent (atomic on Redis). True when this call wrote it. */
+  setnx(key: string, value: unknown, ttlSec?: number): Promise<boolean>;
   /** atomic INCR; the TTL is set when the key is created (fixed window) */
   incr(key: string, ttlSec: number): Promise<number>;
   keys(prefix: string): Promise<string[]>;
@@ -58,6 +60,12 @@ class MemoryKV implements KV {
     const v = (this.live(k)?.v as T) ?? null;
     this.m.delete(k);
     return v;
+  }
+  async setnx(k: string, v: unknown, ttl?: number) {
+    // no await between check and write, so two concurrent calls can't both win
+    if (this.live(k)) return false;
+    this.m.set(k, { v, exp: ttl ? Date.now() + ttl * 1000 : 0 });
+    return true;
   }
   async incr(k: string, ttl: number) {
     const e = this.live(k);
@@ -91,6 +99,10 @@ class UpstashKV implements KV {
   async take<T>(k: string) {
     return (await this.r.getdel<T>(k)) ?? null;
   }
+  async setnx(k: string, v: unknown, ttl?: number) {
+    const r = ttl ? await this.r.set(k, v, { nx: true, ex: ttl }) : await this.r.set(k, v, { nx: true });
+    return r === "OK";
+  }
   async incr(k: string, ttl: number) {
     return Number(await this.r.eval<string[], number>(INCR_LUA, [k], [String(ttl)]));
   }
@@ -111,7 +123,16 @@ declare global {
 }
 
 export function kv(): KV {
-  if (globalThis.__simpKV) return globalThis.__simpKV;
+  const cached = globalThis.__simpKV;
+  if (cached && typeof cached.setnx === "function") return cached;
+  if (cached instanceof Object && "m" in cached) {
+    // dev hot reload only: an in-memory store built by an older version of this
+    // module keeps its data but gains the current methods
+    const next = new MemoryKV();
+    Object.assign(next, { m: (cached as unknown as { m: unknown }).m });
+    globalThis.__simpKV = next;
+    return next;
+  }
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) {
