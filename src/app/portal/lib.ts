@@ -3,12 +3,33 @@
 import { useEffect, useState } from "react";
 import type { LedgerEntry } from "@/lib/points/ledger";
 import type { Submission, SubmissionKind } from "@/lib/points/submissions";
-import type { PoolId } from "@/lib/points/config";
+import type { BucketId, PoolId } from "@/lib/points/config";
 import { ApiError } from "./api-error";
 import { FIXTURES_ENABLED, fixtureApi, readFixture } from "./fixtures";
 
 export { ApiError };
-export type { LedgerEntry, Submission, SubmissionKind, PoolId };
+export type { LedgerEntry, Submission, SubmissionKind, PoolId, BucketId };
+
+export type Category = "holder" | "card" | "active_monad" | "none";
+
+export type TodayPool = {
+  bucket: BucketId;
+  day: string;
+  allowance: number;
+  instantPaid: number;
+  left: number;
+  participants: number;
+  totalUnits: number;
+  closesAt: number;
+  /** the most one wallet can get today (instant + share) */
+  walletCap?: number;
+  mine?: { units: number; instant?: number; provisional: number; roomLeft?: number };
+};
+
+export type Welcome =
+  | { status: "granted"; amount: number; at: number }
+  | { status: "pending"; amount: number; eta: number | null; reason: "holding_time" | "budget" | "season_closed" }
+  | { status: "not_eligible"; reason: "not_in_season" | "tokens_used" };
 
 export type Me = {
   address: string;
@@ -16,6 +37,41 @@ export type Me = {
   holder: boolean;
   nfts: number;
   monadCard: { enabled: boolean; holder: boolean };
+  category: Category;
+  categoryLabel: string;
+  categories: { holder: boolean; card: boolean; activeMonad: boolean };
+  txCount: number | null;
+  telegram: { bound: boolean; multiplier: number; bonus: number };
+  welcome: Welcome;
+  seasonPost: { season: number; windowStart: number; windowEnd: number; open: boolean; state: "none" | "pending" | "approved" };
+  holding: {
+    nftDays: number;
+    totalNftDays: number;
+    missedSnapshot: boolean;
+    txOk: boolean | null;
+    snapshots: { taken: number; total: number };
+  };
+  projected: {
+    earned: Partial<Record<BucketId, number>>;
+    share: Partial<Record<BucketId, number>>;
+    total: number;
+    basis: "posters" | "if_all_post";
+    posters: number;
+    /** false: the estimate leaves out the daily budget that will go unspent (added at season end) */
+    includesUnspentDaily?: boolean;
+  };
+  /** today's daily split in the wallet's sub-pool (null when it can't earn) */
+  today:
+    | null
+    | (Omit<TodayPool, "walletCap" | "mine"> & {
+        checkinNow: number | null;
+        postNow: number;
+        /** the most one wallet can take from today's pool (5%) */
+        maxToday: number;
+        walletCap: number;
+        mine: { units: number; instant: number; provisional: number; roomLeft: number };
+        yesterdayShare?: number | null;
+      });
   checkin: { checkedInToday: boolean; streak: number; nextReward: number };
   x: { handle: string; verified: boolean; code?: string } | null;
   caps: Record<SubmissionKind, number>;
@@ -30,6 +86,21 @@ export type SeasonInfo = {
   start: number;
   end: number;
   pools: { pool: PoolId; budget: number; emitted: number }[];
+  buckets?: {
+    bucket: BucketId;
+    pool: PoolId;
+    budget: number;
+    instantCap: number;
+    instantPaid: number;
+    endPot: number;
+    endPaid: number;
+    basis: number;
+    open: boolean;
+  }[];
+  finalWindow?: { start: number; end: number; open: boolean };
+  snapshots?: { taken: number; total: number };
+  today?: TodayPool[];
+  telegramMultiplier?: number;
   simps: number;
   current: number;
   now: number;
@@ -71,25 +142,39 @@ export const fmt = (n: number) => nf.format(Math.round(n));
 export const compact = (n: number) =>
   new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 
+/** the community pool's id is still "monad" (stable key); it shows as "community" */
 export const POOL_LABEL: Record<PoolId, string> = {
+  active: "Active simps",
+  holding: "Holding",
+  monad: "Community",
+};
+
+export const BUCKET_LABEL: Record<BucketId, string> = {
   active: "active simps",
   holding: "holding",
-  monad: "monad card",
+  card: "monad card holders",
+  amu: "active monad users",
 };
 
 export const KIND_LABEL: Record<SubmissionKind, string> = {
   x_post: "x post",
   simp_post: "simp post",
   alpha: "alpha",
+  season_post: "season post",
 };
 
 export function reasonLabel(e: LedgerEntry): string {
   const r = e.reason;
-  if (r === "checkin") return `check-in${e.meta?.streak ? ` · day ${e.meta.streak}` : ""}`;
+  const x3 = Number(e.meta?.multiplier ?? 1) > 1 ? ` · ${e.meta?.multiplier}× telegram` : "";
+  if (r === "checkin") return `check-in${e.meta?.streak ? ` · day ${e.meta.streak}` : ""}${x3}`;
   if (r === "holding") return `holding · ${e.meta?.tokens ?? "?"} simp${e.meta?.tokens === 1 ? "" : "s"}`;
-  if (r === "x_post") return "x post paid";
-  if (r === "simp_post") return "simp post paid";
-  if (r === "alpha") return "alpha paid";
+  if (r === "holding_drop") return `holding drop · season ${e.season}`;
+  if (r === "season_share") return `season ${e.season} share · ${e.bucket ? BUCKET_LABEL[e.bucket] : "pool"}`;
+  if (r === "welcome") return "welcome bonus";
+  if (r === "dayshare") return `daily share · ${String(e.meta?.day ?? "").slice(5)}`;
+  if (r === "x_post") return `x post paid${x3}`;
+  if (r === "simp_post") return `simp post paid${x3}`;
+  if (r === "alpha") return `alpha paid${x3}`;
   if (r === "admin:grant") return `bonus${e.meta?.note ? ` · ${String(e.meta.note)}` : ""}`;
   if (r === "admin:revoke") return `correction${e.meta?.note ? ` · ${String(e.meta.note)}` : ""}`;
   if (r.startsWith("game:")) {

@@ -1,6 +1,6 @@
 import "server-only";
 import { isAddress } from "viem";
-import { POINTS_CONFIG, poolBudget, seasonAt, type PoolId } from "./config";
+import { BUCKET_POOL, POINTS_CONFIG, instantCap, seasonAt, type BucketId, type PoolId } from "./config";
 import { store, type ApplyResult } from "./store";
 import { K } from "./keys";
 
@@ -8,10 +8,14 @@ import { K } from "./keys";
  * The points ledger. Server-authoritative; nothing here is reachable from
  * client JS except through the API routes.
  *
- * Two kinds of balance change:
- *   - emissions (`emit`): new points from a pool. Capped by the pool's season
- *     budget inside the same atomic script, and counted on the season
- *     leaderboard (season-earned points = what settles onchain).
+ * Three kinds of balance change:
+ *   - instant emissions (`emit`): new points from a bucket (pool / sub-pool).
+ *     Capped by the bucket's instant budget (10% of its season budget) inside
+ *     the same atomic script, and counted on the season leaderboard and the
+ *     bucket's earned board (the pro-rata basis for the season-end share).
+ *   - season-end payouts (`emitSeasonEnd`): the frozen 90% shares and the
+ *     holding drop, capped by the bucket's end pot. They touch neither board:
+ *     the frozen settlement already counts them.
  *   - transfers with the house (`credit` / `debit`): games and other spends.
  *     They never touch pool budgets or the leaderboard; they're tallied in the
  *     season stats (`house_out` / `house_in`) so net game flow stays visible.
@@ -27,6 +31,8 @@ export type LedgerEntry = {
   reason: string;
   /** pool the points came from; null for house transfers */
   pool: PoolId | null;
+  /** sub-pool (bucket) for emissions; absent on entries before rules v2 */
+  bucket?: BucketId;
   season: number;
   ts: number;
   meta?: Record<string, unknown>;
@@ -92,10 +98,12 @@ type ApplyOpts = {
   delta: number;
   reason: string;
   refId: string;
-  pool: PoolId | null;
+  bucket: BucketId | null;
   meta?: Record<string, unknown>;
   /** season whose pool / leaderboard / stats this touches (default: current) */
   season?: number;
+  /** season-end payout: counted against the end pot, not on the boards */
+  end?: { cap: number };
 };
 
 /**
@@ -113,12 +121,14 @@ async function apply(o: ApplyOpts): Promise<Receipt> {
     address: o.address,
     amount: o.delta,
     reason: o.reason,
-    pool: o.pool,
+    pool: o.bucket ? BUCKET_POOL[o.bucket] : null,
+    ...(o.bucket ? { bucket: o.bucket } : {}),
     season,
     ts: Date.now(),
     ...(o.meta ? { meta: o.meta } : {}),
   };
-  const isEmission = o.pool !== null;
+  const isEmission = o.bucket !== null;
+  const b = o.bucket!;
   const res: ApplyResult = await store().apply({
     balKey: K.bal(o.address),
     refKey: K.ref(o.dir, o.address, o.refId),
@@ -126,17 +136,20 @@ async function apply(o: ApplyOpts): Promise<Receipt> {
     ledgerKey: K.ledger(o.address),
     delta: o.delta,
     entry: JSON.stringify(entry),
-    ...(isEmission
-      ? {
-          poolKey: K.pool(season, o.pool!),
-          // negative deltas skip the cap check but still return points to the pool
-          poolCap: poolBudget(o.pool!, season),
-          lbKey: K.lb(season),
-          lbMember: o.address,
-        }
-      : {}),
+    ...(isEmission && o.end
+      ? { poolKey: K.poolEnd(season, b), poolCap: o.end.cap }
+      : isEmission
+        ? {
+            poolKey: K.pool(season, b),
+            // negative deltas skip the cap check but still return points to the bucket
+            poolCap: instantCap(b, season),
+            lbKey: K.lb(season),
+            lbMember: o.address,
+            lbBucketKey: K.lbBucket(season, b),
+          }
+        : {}),
     statsKey: K.stats(season),
-    statsField: isEmission ? `emit_${o.pool}` : o.delta > 0 ? "house_out" : "house_in",
+    statsField: isEmission ? `${o.end ? "end" : "emit"}_${b}` : o.delta > 0 ? "house_out" : "house_in",
     keep: POINTS_CONFIG.ledgerKeep,
   });
 
@@ -160,7 +173,9 @@ async function apply(o: ApplyOpts): Promise<Receipt> {
     case "pool_exhausted":
       throw new PointsError(
         "pool_exhausted",
-        `the ${o.pool} pool is tapped out for season ${season}`,
+        o.end
+          ? `the ${b} season-end pot for season ${season} is fully paid`
+          : `this season's instant ${b === "card" || b === "amu" ? "community" : b} budget is used up — season-end shares still pay`,
         res.balance,
       );
   }
@@ -185,7 +200,7 @@ export async function credit(addr: string, amount: number, reason: string, refId
   checkAmount(amount);
   checkReason(reason);
   checkRef(refId);
-  return apply({ dir: "c", address, delta: amount, reason, refId, pool: null });
+  return apply({ dir: "c", address, delta: amount, reason, refId, bucket: null });
 }
 
 /**
@@ -198,7 +213,7 @@ export async function debit(addr: string, amount: number, reason: string, refId:
   checkAmount(amount);
   checkReason(reason);
   checkRef(refId);
-  return apply({ dir: "d", address, delta: -amount, reason, refId, pool: null });
+  return apply({ dir: "d", address, delta: -amount, reason, refId, bucket: null });
 }
 
 /** most recent entries first */
@@ -210,12 +225,15 @@ export async function ledger(addr: string, limit = 50): Promise<LedgerEntry[]> {
 // ───────────────────────── internal: emissions ─────────────────────────
 
 /**
- * Mint new points out of a pool for the current season. The budget check and
- * the credit happen in one atomic step. Throws `season_closed` before season 1
- * and `pool_exhausted` when the season's pool budget can't cover `amount`.
+ * Mint new points out of a bucket's instant budget for the current season.
+ * The cap check and the credit happen in one atomic step. Throws
+ * `season_closed` before season 1 and `pool_exhausted` when the bucket's
+ * instant budget (10% of its season budget; 0 for holding) can't cover
+ * `amount`. Activity payouts go through `payActivity` (activity.ts), which
+ * applies the Telegram multiplier before calling this.
  */
 export async function emit(
-  pool: PoolId,
+  bucket: BucketId,
   addr: string,
   amount: number,
   reason: string,
@@ -227,7 +245,52 @@ export async function emit(
   checkReason(reason);
   checkRef(refId);
   if (seasonAt() < 1) throw new PointsError("season_closed", "season 1 hasn't started yet");
-  return apply({ dir: "e", address, delta: amount, reason, refId, pool, meta });
+  return apply({ dir: "e", address, delta: amount, reason, refId, bucket, meta });
+}
+
+/**
+ * Instant emission booked to an explicit season (the daily-share close of a
+ * day that may belong to a season that just ended). Same cap and boards as
+ * `emit`.
+ */
+export async function emitInSeason(
+  bucket: BucketId,
+  addr: string,
+  amount: number,
+  season: number,
+  reason: string,
+  refId: string,
+  meta?: Record<string, unknown>,
+): Promise<Receipt> {
+  const address = normAddr(addr);
+  checkAmount(amount);
+  checkReason(reason);
+  checkRef(refId);
+  if (!Number.isSafeInteger(season) || season < 1) throw new PointsError("invalid_season", "bad season");
+  return apply({ dir: "e", address, delta: amount, reason, refId, bucket, meta, season });
+}
+
+/**
+ * Credit a frozen season-end share / holding drop for `season` (a past
+ * season). Capped atomically by `pot` on the bucket's end counter;
+ * idempotent per (address, refId).
+ */
+export async function emitSeasonEnd(
+  bucket: BucketId,
+  addr: string,
+  amount: number,
+  season: number,
+  pot: number,
+  reason: string,
+  refId: string,
+  meta?: Record<string, unknown>,
+): Promise<Receipt> {
+  const address = normAddr(addr);
+  checkAmount(amount);
+  checkReason(reason);
+  checkRef(refId);
+  if (!Number.isSafeInteger(season) || season < 1) throw new PointsError("invalid_season", "bad season");
+  return apply({ dir: "e", address, delta: amount, reason, refId, bucket, meta, season, end: { cap: pot } });
 }
 
 /**
@@ -238,7 +301,7 @@ export async function emit(
  * pool counter can never drop below what it really emitted.
  */
 export async function revokeEmission(
-  pool: PoolId,
+  bucket: BucketId,
   addr: string,
   amount: number,
   reason: string,
@@ -253,5 +316,5 @@ export async function revokeEmission(
   if (!Number.isSafeInteger(season) || season < 1 || season > seasonAt()) {
     throw new PointsError("invalid_season", `season must be a whole number between 1 and ${seasonAt()}`);
   }
-  return apply({ dir: "e", address, delta: -amount, reason, refId, pool, meta, season });
+  return apply({ dir: "e", address, delta: -amount, reason, refId, bucket, meta, season });
 }

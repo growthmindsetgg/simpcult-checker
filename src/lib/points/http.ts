@@ -1,5 +1,5 @@
 import "server-only";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getSession, type Session } from "@/lib/server/session";
 import { PointsError } from "./ledger";
 import { isStorageUnconfigured } from "./store";
@@ -49,6 +49,18 @@ export function fail(e: unknown) {
   }
   console.error("[points]", e);
   return NextResponse.json({ error: "something broke on our side — try again" }, { status: 500, headers: NO_STORE });
+}
+
+/**
+ * Run `fn` after the response is sent (Next's `after`). Outside a request
+ * scope (scripts, tests) it's skipped instead of throwing.
+ */
+export function background(fn: () => Promise<unknown>) {
+  try {
+    after(() => fn().catch((e) => console.error("[points] background", e)));
+  } catch {
+    /* no request scope */
+  }
 }
 
 /** wraps a handler so thrown HttpError / PointsError become JSON responses */

@@ -7,18 +7,48 @@ import type { Address } from "viem";
  * Server-only knobs (admin allowlist, cron secret) are read from env inside
  * `src/lib/points/server/*`.
  *
- * Supply model (confirmed 2026-11-24):
+ * Supply model (confirmed 2026-11-24, rules v2 2026-11-27 — see
+ * research/POINTS-RULES-v2.md):
  *   1,000,000,000 points, fixed. Three pools:
- *     active  69%  — Simp Cult holders, earned through tasks
- *     holding 21%  — Simp Cult holders, passive, per NFT held
- *     monad   10%  — Monad card holders ("simp" posts)
+ *     active    69%  — Simp Cult holders, earned through activities
+ *     holding   21%  — Simp Cult holders, one season-end drop by NFT-days
+ *     community 10%  — 9% Monad card holders + 1% active Monad users
  *   Seasons are 6 weeks. Each pool releases half of its allocation in S1,
  *   then halves every season forever: S1 = 500M, S2 = 250M, S3 = 125M …
  *   The sum converges to the cap and never exceeds it.
+ *
+ * Active and community pools follow the 10/90 rule: 10% of the season
+ * budget pays instantly for activities, 90% is shared at season end
+ * pro-rata by points earned in that pool, only to wallets that posted in
+ * the final 48 hours. Shares of wallets that didn't post are burnt.
+ *
+ * Pool id vs. name: the community pool keeps the stable id `"monad"` (it is
+ * also the Redis key segment and the home page keys its copy by it). Show it
+ * as "community" everywhere; use `COMMUNITY` in code.
  */
 
 export type PoolId = "active" | "holding" | "monad";
 export const POOLS: PoolId[] = ["active", "holding", "monad"];
+/** the community pool's stable id (displayed as "community") */
+export const COMMUNITY: PoolId = "monad";
+
+/**
+ * Ledger buckets: every emission hits exactly one. The community pool is
+ * split into its two sub-pools so each gets its own caps and season-end
+ * share. Bucket ids are also Redis key segments.
+ *   card — Monad card holders (90% of the community pool = 9% overall)
+ *   amu  — active Monad users (10% of it = 1% overall)
+ */
+export type BucketId = "active" | "holding" | "card" | "amu";
+export const BUCKETS: BucketId[] = ["active", "holding", "card", "amu"];
+/** buckets that pay activities instantly (10%) + a season-end share (90%) */
+export const SHARE_BUCKETS: BucketId[] = ["active", "card", "amu"];
+export const BUCKET_POOL: Record<BucketId, PoolId> = {
+  active: "active",
+  holding: "holding",
+  card: "monad",
+  amu: "monad",
+};
 
 const DAY_MS = 86_400_000;
 
@@ -68,20 +98,76 @@ export const POINTS_CONFIG = {
     },
     /** X post about Simp Cult (holders → active pool) */
     xPost: { reward: 5_000, dailyCap: 3, maxAgeDays: 7 },
-    /** X post using the word "simp" (Monad card holders → monad pool) */
+    /** X post using the word "simp" (card holders / active Monad users → community pool) */
     simpPost: { reward: 2_500, dailyCap: 3, maxAgeDays: 7 },
     /** alpha / contributions — admin picks the amount within [min, max] */
     alpha: { default: 25_000, min: 1_000, max: 250_000, dailyCap: 3 },
   },
 
+  /** the 10/90 rule (basis points of a bucket's season budget) */
+  split: {
+    instantBps: 1_000,
+    /** card holders' cut of the community pool; the rest is active Monad users */
+    cardBpsOfCommunity: 9_000,
+    /** the final-window X post that unlocks the 90% share */
+    finalWindowHours: 48,
+  },
+
+  /** Telegram-bound wallets: every activity payout × this */
+  telegramMultiplier: 3,
+
+  /** transactions on Monad (`getTransactionCount`) a wallet needs */
+  tx: {
+    /** non-holders without a card: "active Monad users" */
+    activeUser: 50,
+    /** holders: to receive the season-end holding drop */
+    holdingDrop: 1,
+  },
+
   /**
-   * Passive holding. Paid once per UTC day per tokenId to whoever holds it at
-   * the snapshot. Rate per NFT per day is derived so the season's holding
-   * budget is exactly spread across `nftSupply` × season days.
+   * Holding: NFT-days are counted once per UTC day per tokenId (to whoever
+   * holds it at the daily accrual) and the whole holding budget pays out
+   * once at season end, pro-rata by NFT-days. `snapshots` random checks a
+   * season: a counted wallet holding nothing at one loses the drop.
    */
   holding: {
     // literal env access so Next inlines it in client bundles too
     nftSupply: toInt(process.env.NEXT_PUBLIC_NFT_SUPPLY, 421),
+    snapshots: 5,
+  },
+
+  /** one-time welcome bonus, flat (never season-scaled, never 3x) */
+  welcome: {
+    holder: 1_000,
+    /** how long the wallet must have held a Simp Cult NFT */
+    holdMinutes: 69,
+    /** Monad card holders and active Monad users */
+    community: 100,
+    /** welcome payouts may use at most this share of a sub-pool's season instant budget; the rest wait for next season */
+    maxShareOfInstant: 0.2,
+  },
+
+  /**
+   * Auto-pace (the daily split). Each share sub-pool (active, card, amu) gets
+   * a daily allowance = remaining instant budget ÷ remaining season days,
+   * fixed at the day's first touch. During the day every activity pays a
+   * small instant amount (`rate` points per weight unit; weight = the reward
+   * table's base × Telegram 3x), and at UTC day close the rest of the
+   * allowance is shared pro-rata by weight units among that day's
+   * participants — fewer participants, bigger share each.
+   *   rate = instantFraction × allowance ÷ expected units, ≤ 1 (never above
+   *          the reward table). Expected units = yesterday's units in this
+   *          season (day 1: `priorUnits`), never below `minUnits`, both
+   *          quoted at season-1 value and halved each season.
+   *   Once instant payouts reach instantFraction of the allowance, actions
+   *   pay 1 point instantly; their weight still counts for the close.
+   */
+  pace: {
+    instantFraction: 0.25,
+    /** no wallet's day total (instant + day share) may exceed this share of the day's allowance; the excess rolls forward */
+    walletCapShare: 0.05,
+    priorUnits: { active: 5_000_000, card: 700_000, amu: 700_000 } as Record<string, number>,
+    minUnits: { active: 60_000, card: 35_000, amu: 35_000 } as Record<string, number>,
   },
 
   /**
@@ -95,8 +181,10 @@ export const POINTS_CONFIG = {
     oembedUrl: "https://publish.x.com/oembed",
     /** a Simp Cult post must contain one of these (case-insensitive) */
     simpCultKeywords: ["simp cult", "simpcult", "@monadsimpcult", "#simpcult"],
-    /** a Monad card "simp" post must contain one of these */
+    /** a community "simp" post must contain one of these */
     simpKeywords: ["simp"],
+    /** the final-48h post must also mention the season */
+    seasonKeywords: ["season"],
   },
 
   /**
@@ -178,11 +266,35 @@ export function checkinReward(season: number, streak: number): number {
   return scaledReward(Math.floor(c.base * (1 + bonus)), season);
 }
 
-/** holding points per NFT per UTC day in a season */
-export function holdingRatePerNftPerDay(season: number): number {
-  const days = POINTS_CONFIG.season.lengthDays;
-  const n = Math.max(1, POINTS_CONFIG.holding.nftSupply);
-  return Math.floor(poolBudget("holding", season) / (n * days));
+/** a bucket's share of its pool's season budget */
+export function bucketBudget(bucket: BucketId, season: number): number {
+  if (bucket === "active" || bucket === "holding") return poolBudget(bucket, season);
+  const community = poolBudget(COMMUNITY, season);
+  const card = Math.floor((community * POINTS_CONFIG.split.cardBpsOfCommunity) / 10_000);
+  return bucket === "card" ? card : community - card;
+}
+
+/** hard cap on a bucket's instant (activity) payouts in a season: 10%, holding 0 */
+export function instantCap(bucket: BucketId, season: number): number {
+  if (bucket === "holding") return 0;
+  return Math.floor((bucketBudget(bucket, season) * POINTS_CONFIG.split.instantBps) / 10_000);
+}
+
+/**
+ * The season-end pot: whatever of the budget the instant side may not use.
+ * 90% for the share buckets, 100% for holding. `instantEmitted` lowers it
+ * only when instant payouts went past the cap (legacy daily holding payouts
+ * made before rules v2), so the season total can never exceed the budget.
+ */
+export function endPot(bucket: BucketId, season: number, instantEmitted = 0): number {
+  const b = bucketBudget(bucket, season);
+  return Math.max(0, b - Math.max(instantCap(bucket, season), instantEmitted));
+}
+
+/** the final-48h window in which the "upcoming season" post must be submitted */
+export function finalWindow(season: number): { start: number; end: number } {
+  const { end } = seasonBounds(season);
+  return { start: end - POINTS_CONFIG.split.finalWindowHours * 3_600_000, end };
 }
 
 /** UTC day key, e.g. "2026-11-24" */

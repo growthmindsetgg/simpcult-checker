@@ -19,6 +19,7 @@ import {
   ReceiptRoll,
   SeasonMachine,
   SlipDesk,
+  Standing,
   WarmingUp,
 } from "./parts";
 import s from "./portal.module.css";
@@ -30,7 +31,7 @@ import s from "./portal.module.css";
  *   signedout → no wallet: a void ticket + "connect wallet"
  *   signin    → wallet, no session: "sign in (free)"
  *   jammed    → /me failed
- *   desk      → the real thing (non-holders get a "members only" stamp)
+ *   desk      → the real thing (wallets out of the season get a "not in this season" stamp)
  * The one neon button is the ticket's until it's punched, then the slip's.
  */
 export function Portal() {
@@ -40,7 +41,10 @@ export function Portal() {
   const real = useSession();
   const fs = fx ? fixtureSession(fx) : null;
 
-  const connected = fs ? fs.connected : wallet.isConnected;
+  // signed in = a connected wallet OR a valid server session: "send and set"
+  // (self-transaction) users never connect a wallet here. useSession drops the
+  // session only when a *different* wallet is connected.
+  const connected = fs ? fs.connected : wallet.isConnected || !!real.session;
   const address = fs ? (fs.signedIn ? fs.address : null) : (real.session?.address ?? null);
   const sessionLoading = fs ? false : real.isLoading;
 
@@ -78,25 +82,25 @@ export function Portal() {
   const n = season.data?.season ?? Math.max(1, seasonAt());
   const live = season.data ? season.data.live : seasonAt() >= 1;
   const m = view === "desk" ? me.data : undefined;
-  const eligible = !!m && (m.holder || m.monadCard.holder);
-  const ticketVariant = !live ? "closed" : m && !m.holder ? "members" : "live";
-  const slipHot = !!m && (!m.holder || !live || m.checkin.checkedInToday);
+  const eligible = !!m && m.category !== "none";
+  const ticketVariant = !live ? "closed" : m && !eligible ? "members" : "live";
+  const slipHot = !!m && (!eligible || !live || m.checkin.checkedInToday || (m.seasonPost.open && m.seasonPost.state === "none"));
 
   return (
     <div className={s.desk}>
       {FIXTURES_ENABLED && <DevFixtures current={fx} />}
       <Mast info={season.data} />
 
-      {view === "loading" && <Printing label={mounted ? "printing your ticket" : "warming the printer"} />}
+      {view === "loading" && <Printing label={mounted ? "Printing your ticket" : "Warming the printer"} />}
       {view === "warming" && <WarmingUp />}
       {(view === "signedout" || view === "signin") && (
         <div className={s.rowA}>
-          <Plaque />
+          <Plaque empty={view} />
           <CheckinTicket variant={!live ? "closed" : view} season={n} />
         </div>
       )}
       {view === "jammed" && (
-        <Jammed message={(me.error as Error)?.message ?? "try again in a moment"} onRetry={() => me.refetch()} />
+        <Jammed message={(me.error as Error)?.message ?? "Try again in a moment."} onRetry={() => me.refetch()} />
       )}
       {view === "desk" && m && (
         <>
@@ -104,6 +108,7 @@ export function Portal() {
             <Plaque me={m} />
             <CheckinTicket variant={ticketVariant} me={m} season={n} />
           </div>
+          <Standing me={m} info={season.data} />
           <div className={s.rowB}>
             <SlipDesk me={m} hot={slipHot && eligible} />
             <ReceiptRoll me={m} />
@@ -132,7 +137,7 @@ export function Portal() {
 function DevFixtures({ current }: { current: string | null }) {
   return (
     <nav className={s.devbar} aria-label="dev fixtures">
-      <span>dev fixtures:</span>
+      <span>Dev fixtures:</span>
       <a href="?" aria-current={!current}>
         live
       </a>

@@ -54,6 +54,8 @@ export type ApplyArgs = {
   /** season leaderboard zset + member (only for pool emissions) */
   lbKey?: string;
   lbMember?: string;
+  /** per-bucket earned zset, same member and delta (instant emissions only) */
+  lbBucketKey?: string;
   /** season stats hash + field to HINCRBY by delta */
   statsKey?: string;
   statsField?: string;
@@ -92,15 +94,19 @@ export interface PointsStore {
   /** removes members from a set (used to hand back a lock when a step fails) */
   sremEach(key: string, members: string[]): Promise<void>;
   hgetall(key: string): Promise<Record<string, number>>;
+  zincrby(key: string, by: number, member: string): Promise<number>;
+  smembers(key: string): Promise<string[]>;
+  sismember(key: string, member: string): Promise<boolean>;
   readonly persistent: boolean;
 }
 
 // ───────────────────────────── Upstash ─────────────────────────────
 
 /*
- * KEYS: 1 bal, 2 ref, 3 ledger, 4 pool, 5 lb, 6 stats
+ * KEYS: 1 bal, 2 ref, 3 ledger, 4 pool, 5 lb, 6 stats, 7 per-bucket lb
  * ARGV: 1 delta, 2 entry, 3 poolCap (-1 = none), 4 lbMember ('' = none),
- *       5 keep, 6 statsField ('' = none), 7 refTtl seconds (0 = forever)
+ *       5 keep, 6 statsField ('' = none), 7 refTtl seconds (0 = forever),
+ *       8 '1' = also count on the per-bucket lb (KEYS[7]), '' = don't
  * Returns {code, balance, extra}: code 1 ok, 2 duplicate, 0 refused.
  * ARGV values arrive as strings — everything numeric goes through tonumber.
  */
@@ -117,6 +123,10 @@ if cap >= 0 then
   if delta < 0 and ARGV[4] ~= '' then
     local earned = tonumber(redis.call('ZSCORE', KEYS[5], ARGV[4]) or '0')
     if earned + delta < 0 then return {0, bal, 'not_earned'} end
+    if ARGV[8] ~= '' then
+      local inBucket = tonumber(redis.call('ZSCORE', KEYS[7], ARGV[4]) or '0')
+      if inBucket + delta < 0 then return {0, bal, 'not_earned'} end
+    end
   end
   redis.call('INCRBY', KEYS[4], delta)
 end
@@ -130,6 +140,7 @@ end
 redis.call('LPUSH', KEYS[3], ARGV[2])
 redis.call('LTRIM', KEYS[3], 0, tonumber(ARGV[5]) - 1)
 if ARGV[4] ~= '' then redis.call('ZINCRBY', KEYS[5], delta, ARGV[4]) end
+if ARGV[4] ~= '' and ARGV[8] ~= '' then redis.call('ZINCRBY', KEYS[7], delta, ARGV[4]) end
 if ARGV[6] ~= '' then redis.call('HINCRBY', KEYS[6], ARGV[6], delta) end
 return {1, bal, ''}
 `;
@@ -148,6 +159,7 @@ export class UpstashStore implements PointsStore {
       a.poolKey ?? `${P}:none`,
       a.lbKey ?? `${P}:none`,
       a.statsKey ?? `${P}:none`,
+      a.lbBucketKey ?? `${P}:none`,
     ];
     const args = [
       String(a.delta),
@@ -157,6 +169,7 @@ export class UpstashStore implements PointsStore {
       String(a.keep),
       a.statsKey && a.statsField ? a.statsField : "",
       String(a.refTtl ?? 0),
+      a.lbKey && a.lbMember && a.lbBucketKey ? "1" : "",
     ];
     const [code, bal, extra] = await this.r.eval<string[], [number, number, unknown]>(APPLY_LUA, keys, args);
     const balance = Number(bal);
@@ -239,6 +252,15 @@ export class UpstashStore implements PointsStore {
     const h = (await this.r.hgetall<Record<string, number | string>>(key)) ?? {};
     return Object.fromEntries(Object.entries(h).map(([k, v]) => [k, Number(v)]));
   }
+  async zincrby(key: string, by: number, member: string) {
+    return Number(await this.r.zincrby(key, by, member));
+  }
+  async smembers(key: string) {
+    return (await this.r.smembers<string[]>(key)).map(String);
+  }
+  async sismember(key: string, member: string) {
+    return Number(await this.r.sismember(key, member)) === 1;
+  }
 }
 
 // ───────────────────────────── memory ─────────────────────────────
@@ -288,6 +310,10 @@ export class MemoryStore implements PointsStore {
       if (a.delta < 0 && a.lbKey && a.lbMember) {
         const earned = this.read<Map<string, number>>(a.lbKey)?.get(a.lbMember) ?? 0;
         if (earned + a.delta < 0) return { status: "not_earned", balance: bal };
+        if (a.lbBucketKey) {
+          const inBucket = this.read<Map<string, number>>(a.lbBucketKey)?.get(a.lbMember) ?? 0;
+          if (inBucket + a.delta < 0) return { status: "not_earned", balance: bal };
+        }
       }
       this.write(a.poolKey, em + a.delta);
     }
@@ -298,6 +324,10 @@ export class MemoryStore implements PointsStore {
     if (a.lbKey && a.lbMember) {
       const z = this.zset(a.lbKey);
       z.set(a.lbMember, (z.get(a.lbMember) ?? 0) + a.delta);
+      if (a.lbBucketKey) {
+        const zb = this.zset(a.lbBucketKey);
+        zb.set(a.lbMember, (zb.get(a.lbMember) ?? 0) + a.delta);
+      }
     }
     if (a.statsKey && a.statsField) {
       const h = this.read<Record<string, number>>(a.statsKey) ?? {};
@@ -389,6 +419,18 @@ export class MemoryStore implements PointsStore {
   }
   async hgetall(key: string) {
     return { ...(this.read<Record<string, number>>(key) ?? {}) };
+  }
+  async zincrby(key: string, by: number, member: string) {
+    const z = this.zset(key);
+    const n = (z.get(member) ?? 0) + by;
+    z.set(member, n);
+    return n;
+  }
+  async smembers(key: string) {
+    return [...(this.read<Set<string>>(key) ?? new Set<string>())];
+  }
+  async sismember(key: string, member: string) {
+    return this.read<Set<string>>(key)?.has(member) ?? false;
   }
 }
 

@@ -5,11 +5,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Passive holding accrual.
- *   GET  — Vercel cron (Authorization: Bearer CRON_SECRET). Add to vercel.json:
- *          { "path": "/api/admin/points/holding", "schedule": "5 0 * * *" }
- *   POST — an admin pressing "run holding" in /portal/admin.
- * Idempotent per tokenId per UTC day, so extra runs never double-pay.
+ * Daily holding count (NFT-days) + any random snapshot that's due.
+ *   GET  — Vercel cron (Authorization: Bearer CRON_SECRET), see vercel.json.
+ *   POST — an admin pressing "count holding" in /portal/admin.
+ * Idempotent per tokenId per UTC day, so extra runs never double-count.
+ * Nothing is paid here: the holding drop pays once at season end.
  */
 export const GET = handle(async (req: Request) => {
   if (!isCron(req)) {

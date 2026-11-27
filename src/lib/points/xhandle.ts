@@ -5,7 +5,8 @@ import { store } from "./store";
 import { K } from "./keys";
 import { HttpError } from "./http";
 import { HANDLE_RE, fetchOEmbed, normHandle, parseStatusUrl } from "./x";
-import { monadCardBalance, nftBalance } from "./chain";
+import { nftBalance } from "./chain";
+import { notEligible, walletProfile } from "./eligibility";
 import { rateLimit } from "@/lib/server/ratelimit";
 
 /**
@@ -19,8 +20,9 @@ import { rateLimit } from "@/lib/server/ratelimit";
  * admin review; only verified handles get instant credit. A handle that one
  * wallet has verified can't be used by any other wallet.
  *
- * Verifying reserves a handle for good, so it is for holders only and
- * rate-limited per wallet.
+ * Verifying reserves a handle for good, so it is for wallets in the season
+ * only (holders, card holders, active Monad users) and rate-limited per
+ * wallet.
  */
 
 export type XHandle = { handle: string; verified: boolean; code: string; at: number };
@@ -60,11 +62,11 @@ export async function verifyHandle(addr: string, url: string): Promise<XHandle> 
   const parsed = parseStatusUrl(url ?? "");
   if (!parsed) throw new HttpError(400, "paste the link to your post (x.com/you/status/…)", "bad_url");
 
-  const [nfts, cards] = await Promise.all([
-    nftBalance(a as `0x${string}`).catch(() => 0),
-    monadCardBalance(a).catch(() => 0),
-  ]);
-  if (nfts < 1 && cards < 1) throw new HttpError(403, "verifying a handle is for holders", "not_holder");
+  const nfts = await nftBalance(a as `0x${string}`).catch(() => 0);
+  if (nfts < 1) {
+    const p = await walletProfile(a);
+    if (p.category === "none") throw notEligible(p);
+  }
   if (!(await rateLimit("xverify", a, 5, 600))) {
     throw new HttpError(429, "too many tries — wait a few minutes and try again", "rate_limited");
   }

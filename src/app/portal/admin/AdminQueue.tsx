@@ -8,10 +8,11 @@ import { toast } from "@/components/Toast";
 import { useSession } from "@/lib/useSession";
 import { useMounted } from "@/lib/useMounted";
 import { short } from "@/lib/config";
-import { POOLS, seasonAt, type PoolId } from "@/lib/points/config";
+import { seasonAt, type BucketId, type PoolId } from "@/lib/points/config";
 import {
   ApiError,
   api,
+  BUCKET_LABEL,
   fmt,
   isWarming,
   KIND_LABEL,
@@ -42,12 +43,24 @@ type Stats = {
     simps: number;
   };
   seasonBudget: number;
-  holdingRatePerNftPerDay: number;
-  lastHoldingRun: null | { day: string; owners: number; tokensPaid: number; pointsPaid: number; errors: string[] };
+  lastHoldingRun: null | { day: string; owners: number; tokensCounted: number; snapshotsTaken: number; errors: string[] };
+  snapshots: { index: number; scheduledAt: number; takenAt: number; tokens: number; missing: number }[];
   persistent: boolean;
 };
 
-type Settlement = { season: number; root: string; total: number; count: number; frozenAt: number; entries: [string, number][] };
+type Drop = { pot: number; paid: number; burnt: number; recipients: number; wallets: number; instantLeftover?: number };
+type Settlement = {
+  season: number;
+  root: string;
+  total: number;
+  count: number;
+  frozenAt: number;
+  entries: [string, number][];
+  drops?: Record<BucketId, Drop>;
+  burnt?: number;
+  posters?: number;
+};
+type Payout = { credited: number; total: number; done: boolean };
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -68,11 +81,9 @@ export function AdminQueue() {
     <div className={s.desk}>
       <header className={s.mast}>
         <div>
-          <span className="plate">back office</span>
-          <h1 className={s.mastTitle}>
-            the pit boss
-          </h1>
-          <p className={s.mastLead}>approve slips, hand out bonuses, run holding, freeze a season for settlement.</p>
+          <p className="t-eyebrow">Back office</p>
+          <h1 className={s.mastTitle}>The pit boss</h1>
+          <p className={s.mastLead}>Approve slips, hand out bonuses, count holding, close a season for settlement.</p>
         </div>
         <Link className="btn btn-ghost" href={`/portal${fx ? `?fixture=${fx}` : ""}`}>
           back to the desk
@@ -84,7 +95,7 @@ export function AdminQueue() {
       ) : !address ? (
         <section className={s.velvet}>
           <p className={s.outText} style={{ margin: "0 0 16px" }}>
-            connect and sign in with an admin wallet.
+            Connect and sign in with an admin wallet.
           </p>
           <WalletButton variant="quiet" />
         </section>
@@ -92,13 +103,13 @@ export function AdminQueue() {
         <section className={s.velvet}>
           <p className={s.outText} style={{ margin: 0 }}>
             {(queue.error as ApiError).code === "siwe_required"
-              ? "admin needs a signature sign-in. sign out, then verify by signing."
-              : `${short(address)} isn't on the admin list (POINTS_ADMINS).`}
+              ? "Admin needs a signature sign-in. Sign out, then verify by signing."
+              : `${short(address)} isn’t on the admin list (POINTS_ADMINS).`}
           </p>
         </section>
       ) : queue.isLoading ? (
         <section className={cx(s.paper, s.printing)} aria-busy="true">
-          <span>pulling the pile…</span>
+          <span>Pulling the pile…</span>
           <span className={s.printingLine} style={{ width: "80%" }} />
           <span className={s.printingLine} style={{ width: "60%" }} />
         </section>
@@ -127,9 +138,12 @@ function StatsPanel({ fx }: { fx: string | null }) {
   const qc = useQueryClient();
   const stats = useQuery({ queryKey: ["admin", "stats", fx], queryFn: () => api<Stats>("/api/admin/points/stats"), retry: retryPolicy });
   const run = useMutation({
-    mutationFn: () => post<{ tokensPaid: number; pointsPaid: number; errors: string[] }>("/api/admin/points/holding", {}),
+    mutationFn: () => post<{ tokensCounted: number; snapshotsTaken: number; errors: string[] }>("/api/admin/points/holding", {}),
     onSuccess: (r) => {
-      toast.ok("holding run done", `${r.tokensPaid} simps paid · ${fmt(r.pointsPaid)} pts${r.errors.length ? ` · ${r.errors.length} errors` : ""}`);
+      toast.ok(
+        "holding counted",
+        `${r.tokensCounted} nft-days added${r.snapshotsTaken ? ` · ${r.snapshotsTaken} snapshot taken` : ""}${r.errors.length ? ` · ${r.errors.length} errors` : ""}`,
+      );
       qc.invalidateQueries({ queryKey: ["admin", "stats"] });
     },
     onError: (e) => toast.bad("holding run failed", (e as Error).message),
@@ -145,7 +159,7 @@ function StatsPanel({ fx }: { fx: string | null }) {
     <section className={s.velvet}>
       <div className={s.panelHead}>
         <h2 className={s.panelTitle}>
-          season {d?.overview.season ?? "—"}
+          Season {d?.overview.season ?? "—"}
         </h2>
         <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
           {d && !d.persistent && (
@@ -154,7 +168,7 @@ function StatsPanel({ fx }: { fx: string | null }) {
             </span>
           )}
           <button className="btn btn-ghost" disabled={run.isPending} aria-busy={run.isPending} onClick={() => run.mutate()}>
-            {run.isPending ? <span className={s.spin} aria-hidden /> : null} run holding now
+            {run.isPending ? <span className={s.spin} aria-hidden /> : null} count holding now
           </button>
         </span>
       </div>
@@ -162,11 +176,14 @@ function StatsPanel({ fx }: { fx: string | null }) {
         <div className={s.statGrid}>
           {d.overview.pools.map((p) => stat(POOL_LABEL[p.pool], `${fmt(p.emitted)} / ${fmt(p.budget)}`))}
           {stat("earners", fmt(d.overview.simps))}
-          {stat("holding / simp / day", fmt(d.holdingRatePerNftPerDay))}
+          {stat(
+            "snapshots taken",
+            `${d.snapshots.length} / 5${d.snapshots.length ? ` · last ${new Date(d.snapshots[d.snapshots.length - 1].takenAt).toISOString().slice(5, 16).replace("T", " ")}` : ""}`,
+          )}
           {stat("games in / out", `${fmt(d.overview.house.in)} / ${fmt(d.overview.house.out)}`)}
           {stat(
             "last holding run",
-            d.lastHoldingRun ? `${d.lastHoldingRun.tokensPaid} simps · ${fmt(d.lastHoldingRun.pointsPaid)}` : "not today",
+            d.lastHoldingRun ? `${d.lastHoldingRun.tokensCounted} nft-days` : "not today",
           )}
         </div>
       )}
@@ -180,12 +197,12 @@ function Pending({ q }: { q: Queue }) {
     <section className={s.velvet}>
       <div className={s.panelHead}>
         <h2 className={s.panelTitle}>
-          the pile
+          The pile
         </h2>
         <span className="t-label">{q.pending.length} waiting</span>
       </div>
       {q.pending.length === 0 ? (
-        <p className={s.boardEmpty}>pile&apos;s empty. go touch grass.</p>
+        <p className={s.boardEmpty}>Pile’s empty. Go touch grass.</p>
       ) : (
         <ul className={s.queue}>
           {q.pending.map((x) => (
@@ -243,7 +260,7 @@ function PendingSlip({
         )}
         {sub.check && (
           <span className={s.flag} data-tone={!sub.check.reachable ? "warn" : sub.check.keyword ? "ok" : "bad"}>
-            {!sub.check.reachable ? "x didn't answer" : `by @${sub.check.author} · ${sub.check.keyword ? "keyword ✓" : "no keyword"}`}
+            {!sub.check.reachable ? "X didn’t answer" : `by @${sub.check.author} · ${sub.check.keyword ? "keyword ✓" : "no keyword"}`}
           </span>
         )}
       </div>
@@ -300,6 +317,9 @@ function PendingSlip({
       </div>
       <span className={s.slipHint}>
         range {fmt(bounds.min)}–{fmt(bounds.max)}
+        {sub.kind === "alpha"
+          ? ". The amount is a weight in today’s pool; the wallet’s day total is capped at 5% of the pool."
+          : ""}
       </span>
     </li>
   );
@@ -313,12 +333,12 @@ function GrantForm() {
   const qc = useQueryClient();
   const [address, setAddress] = useState("");
   const [amount, setAmount] = useState("");
-  const [pool, setPool] = useState<PoolId>("active");
+  const [bucket, setBucket] = useState<BucketId>("active");
   const [note, setNote] = useState("");
   const [mode, setMode] = useState<"grant" | "revoke">("grant");
   const [refId, setRefId] = useState(newRef);
   const m = useMutation({
-    mutationFn: () => post<{ balance: number }>("/api/admin/points/grant", { address, amount: Number(amount), pool, note, mode, refId }),
+    mutationFn: () => post<{ balance: number }>("/api/admin/points/grant", { address, amount: Number(amount), bucket, note, mode, refId }),
     onSuccess: (r) => {
       toast.ok(mode === "grant" ? "granted" : "revoked", `new balance ${fmt(r.balance)}`);
       setAmount("");
@@ -365,10 +385,10 @@ function GrantForm() {
           <label className={s.slipLabel} htmlFor="g-pool">
             pool
           </label>
-          <select id="g-pool" className={cx(s.field, s.selectField)} value={pool} onChange={(e) => setPool(e.target.value as PoolId)}>
-            {POOLS.map((p) => (
-              <option key={p} value={p}>
-                {POOL_LABEL[p]}
+          <select id="g-pool" className={cx(s.field, s.selectField)} value={bucket} onChange={(e) => setBucket(e.target.value as BucketId)}>
+            {(["active", "card", "amu"] as const).map((b) => (
+              <option key={b} value={b}>
+                {BUCKET_LABEL[b]}
               </option>
             ))}
           </select>
@@ -381,7 +401,7 @@ function GrantForm() {
         <input id="g-note" className={s.field} value={note} onChange={(e) => setNote(e.target.value)} />
       </div>
       <div className={s.slipFoot}>
-        <span className={s.slipHint}>grants come out of the season pool; revokes put points back.</span>
+        <span className={s.slipHint}>grants come out of the pool’s 10% instant budget (no telegram bonus); revokes put points back.</span>
         <button
           className={cx("btn btn-ghost btn-on-paper", mode === "revoke" && s.rejectBtn)}
           disabled={m.isPending || !address || !amount || note.length < 3}
@@ -401,19 +421,20 @@ function SettlePanel({ fx }: { fx: string | null }) {
   const qc = useQueryClient();
   const snap = useQuery({
     queryKey: ["admin", "settle", season, fx],
-    queryFn: () => api<{ settlement: Settlement | null }>(`/api/admin/points/settle?season=${Number(season)}`),
+    queryFn: () => api<{ settlement: Settlement | null; payout?: Payout | null }>(`/api/admin/points/settle?season=${Number(season)}`),
     enabled: Number(season) >= 1,
     retry: retryPolicy,
   });
   const freeze = useMutation({
-    mutationFn: () => post<{ settlement: Settlement }>("/api/admin/points/settle", { season: Number(season), force }),
-    onSuccess: () => {
-      toast.ok("season frozen");
+    mutationFn: () => post<{ settlement: Settlement; payout: Payout }>("/api/admin/points/settle", { season: Number(season), force }),
+    onSuccess: (r) => {
+      toast.ok("season frozen", r.payout.done ? "season-end shares all credited" : `credited ${r.payout.credited} of ${r.payout.total}, press again`);
       qc.invalidateQueries({ queryKey: ["admin", "settle"] });
     },
     onError: (e) => toast.bad("freeze failed", (e as Error).message),
   });
   const st = snap.data?.settlement;
+  const payout = snap.data?.payout;
   const download = () => {
     if (!st) return;
     const blob = new Blob([JSON.stringify(st, null, 2)], { type: "application/json" });
@@ -426,10 +447,12 @@ function SettlePanel({ fx }: { fx: string | null }) {
   return (
     <section className={s.velvet}>
       <h2 className={s.panelTitle}>
-        settle a season
+        Settle a season
       </h2>
       <p className={s.outText} style={{ margin: "10px 0 0", fontSize: 14 }}>
-        freezes season-earned points into a merkle root for the soulbound xp contract. one way: a frozen season never changes.
+        Computes the season-end shares (90% to final-48h posters, the rest burnt) and the holding drop, then freezes
+        everything into a Merkle root for the soulbound XP contract and credits the shares. Review pending season posts
+        first. One way: a frozen season never changes.
       </p>
       <div className={s.inline} style={{ marginTop: 16 }}>
         <label className={s.srOnly} htmlFor="settle-season">
@@ -446,23 +469,37 @@ function SettlePanel({ fx }: { fx: string | null }) {
         />
         <button
           className="btn btn-ghost"
-          disabled={!!st || freeze.isPending || Number(season) < 1}
+          disabled={(!!st && !!payout?.done) || freeze.isPending || Number(season) < 1}
           aria-busy={freeze.isPending}
           onClick={() => freeze.mutate()}
         >
-          freeze
+          {st ? "credit shares" : "close season"}
         </button>
       </div>
       {Number(season) >= current && !st && (
         <label className={s.under} style={{ display: "flex", gap: 8, marginTop: 12, color: "var(--d-bad)" }}>
-          <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> season still running, freeze anyway
+          <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> Season still running, freeze anyway (testing only: burns every 90% share whose season post isn’t in yet, and closes the season post)
         </label>
       )}
       {st ? (
         <div style={{ marginTop: 16 }}>
           <div className={s.engravedK}>
             {fmt(st.count)} simps · {fmt(st.total)} xp
+            {st.burnt !== undefined ? ` · ${fmt(st.burnt)} burnt` : ""}
+            {st.posters !== undefined ? ` · ${fmt(st.posters)} season posts` : ""}
+            {payout ? ` · shares credited ${payout.credited}/${payout.total}` : ""}
           </div>
+          {st.drops && (
+            <ul className={s.under} style={{ margin: "8px 0 0", paddingLeft: 16 }}>
+              {(Object.entries(st.drops) as [BucketId, Drop][]).map(([b, d]) => (
+                <li key={b}>
+                  {BUCKET_LABEL[b]}: pot {fmt(d.pot)}
+                  {d.instantLeftover !== undefined ? ` (+${fmt(d.instantLeftover)} unspent daily)` : ""} · paid {fmt(d.paid)} to{" "}
+                  {d.recipients}/{d.wallets} · burnt {fmt(d.burnt)}
+                </li>
+              ))}
+            </ul>
+          )}
           <p className={s.mono} style={{ margin: "8px 0", fontSize: 12, overflowWrap: "anywhere", color: "var(--d-gold-hi)" }}>
             {st.root}
           </p>
@@ -475,7 +512,7 @@ function SettlePanel({ fx }: { fx: string | null }) {
         </div>
       ) : (
         <p className={s.under} style={{ margin: "14px 0 0" }}>
-          not frozen yet.
+          Not frozen yet.
         </p>
       )}
     </section>

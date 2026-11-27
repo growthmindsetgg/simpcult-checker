@@ -1,15 +1,18 @@
 import "server-only";
 import { checkinReward, previousUtcDay, seasonAt, utcDay } from "./config";
-import { emit, normAddr, PointsError, type Receipt } from "./ledger";
+import { normAddr, PointsError, type Receipt } from "./ledger";
 import { store } from "./store";
 import { K } from "./keys";
-import { tokensOf } from "./chain";
 import { HttpError } from "./http";
+import { activityBucket, notEligible, walletProfile } from "./eligibility";
+import { payActivity } from "./activity";
 
 /**
- * Daily check-in: once per UTC day per wallet, holders only. Each tokenId can
- * only power one check-in per day, so one NFT hopping between wallets can't
- * farm the reward.
+ * Daily check-in: once per UTC day per wallet, for every wallet in the
+ * season (holders → active pool, card holders → community 9%, active Monad
+ * users → community 1%). For holders each tokenId can only power one
+ * check-in per day, so one NFT hopping between wallets can't farm it.
+ * Telegram-bound wallets get the activity multiplier.
  */
 
 type Streak = { last: string; count: number };
@@ -28,12 +31,12 @@ export async function checkinStatus(addr: string) {
   return {
     checkedInToday: !!done,
     streak: current,
-    /** today's reward if not checked in yet, otherwise tomorrow's */
+    /** today's base reward if not checked in yet, otherwise tomorrow's (before any Telegram bonus) */
     nextReward: checkinReward(seasonAt(), current + 1),
   };
 }
 
-export async function checkin(addr: string): Promise<Receipt & { streak: number }> {
+export async function checkin(addr: string): Promise<Receipt & { streak: number; multiplier: number; units: number }> {
   const a = normAddr(addr);
   const day = utcDay();
   const season = seasonAt();
@@ -43,32 +46,37 @@ export async function checkin(addr: string): Promise<Receipt & { streak: number 
     throw new HttpError(409, "already checked in today — back after midnight UTC", "already");
   }
 
-  const tokens = await tokensOf(a);
-  if (tokens.length === 0) throw new HttpError(403, "check-ins are for simp cult holders", "not_holder");
+  const profile = await walletProfile(a);
+  const bucket = activityBucket(profile);
+  if (!bucket) throw notEligible(profile);
 
-  const ids = tokens.map(String);
-  const fresh = await store().saddEach(
-    K.checkinTokens(day),
-    ids,
-    60 * 60 * 50, // keep ~2 days
-  );
-  const mine = ids.filter((_, i) => fresh[i]);
-  if (mine.length === 0) {
-    throw new HttpError(409, "your simps already checked in today from another wallet", "tokens_used");
+  // holders: each NFT powers one check-in per day, whichever wallet holds it
+  let mine: string[] = [];
+  if (bucket === "active") {
+    const ids = profile.tokens.map(String);
+    const fresh = await store().saddEach(
+      K.checkinTokens(day),
+      ids,
+      60 * 60 * 50, // keep ~2 days
+    );
+    mine = ids.filter((_, i) => fresh[i]);
+    if (mine.length === 0) {
+      throw new HttpError(409, "your simps already checked in today from another wallet", "tokens_used");
+    }
   }
 
   const prev = await store().get<Streak>(K.streak(a));
   const streak = prev && prev.last === previousUtcDay(day) ? prev.count + 1 : 1;
   const amount = checkinReward(season, streak);
 
-  let receipt: Receipt;
+  let receipt: Receipt & { multiplier: number; units: number };
   try {
-    receipt = await emit("active", a, amount, "checkin", refFor(day), { streak, day });
+    receipt = await payActivity(bucket, a, amount, "checkin", refFor(day), { streak, day });
   } catch (e) {
     // a PointsError means the store refused it and nothing was paid: hand the
     // tokens back so a retry today isn't told "already checked in from another
     // wallet". Any other error may have paid, so the tokens stay used.
-    if (e instanceof PointsError) await store().sremEach(K.checkinTokens(day), mine).catch(() => {});
+    if (e instanceof PointsError && mine.length) await store().sremEach(K.checkinTokens(day), mine).catch(() => {});
     throw e;
   }
   if (!receipt.duplicate) await store().set(K.streak(a), { last: day, count: streak });

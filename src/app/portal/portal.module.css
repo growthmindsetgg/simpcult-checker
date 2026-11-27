@@ -1,14 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════
-   /portal — the points desk. casino printed matter, not web cards:
-   brass plaques, cream pit slips, a receipt roll, an engraved board.
-   one neon thing per view (.neon). everything scoped under .desk.
+   /portal — the points desk, house lights up. plum panels (the same
+   surfaces as .glass), cream stock for anything printed (ticket, slips,
+   receipt roll, pay table), brass only as hardware. one pink key per
+   view. everything scoped under .desk; colours come from globals.css.
    ═══════════════════════════════════════════════════════════════ */
 
 .desk {
-  --d-ink: var(--ink, #0a0610);
-  --d-velvet: var(--velvet, #2a0b1f);
-  --d-velvet-hi: var(--velvet-hi, #4a1236);
-  --d-velvet-lo: var(--velvet-lo, #170611);
+  --d-ink: var(--ink, #29133a);
+  --d-raised: var(--ink-2, #371c4e);
+  --d-raised-2: var(--ink-3, #442861);
+  --d-deep: var(--deep, #0e091c);
   --d-neon: var(--neon, #ff3fae);
   --d-neon-hot: var(--neon-hot, #ff8fd6);
   --d-gold: var(--gold, #d9a845);
@@ -19,11 +20,18 @@
   --d-paper-2: var(--paper-2, #e4d2b0);
   --d-paper-ink: var(--paper-ink, #2b1320);
   --d-red: var(--paper-red, #b3263f);
-  --d-ok: #7fe0b0;
-  --d-bad: #ff7a5c;
-  --d-text: #f6e9ef;
-  --d-dim: rgba(246, 233, 239, 0.66);
-  --d-mute: rgba(246, 233, 239, 0.44);
+  --d-monad-text: var(--monad-text, #a898ff);
+  --d-ok: var(--ok, #7fe0b0);
+  --d-bad: var(--bad, #ff8a70);
+  --d-text: var(--text, #f7f3ff);
+  --d-dim: var(--text-2, #d9cff5);
+  --d-mute: var(--text-3, #b8aae6);
+  --d-line: rgba(217, 168, 69, 0.2);
+  --d-line-strong: rgba(217, 168, 69, 0.36);
+  /* the plum panel: same stock as the global .glass */
+  --d-panel:
+    radial-gradient(120% 70% at 50% -10%, rgba(110, 84, 255, 0.16), transparent 62%),
+    linear-gradient(180deg, #3d2156 0%, #321a47 100%);
   --serif: var(--font-bodoni, "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif);
   --mono: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace);
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
@@ -45,14 +53,14 @@
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-/* a small label on velvet ("season 1", "on the table this season"): brass italic, sentence case */
+/* a small serif aside ("Day 4 of 42"): lilac italic, sentence case */
 .tag {
   font-family: var(--serif);
   font-style: italic;
   font-size: 15px;
   font-weight: 500;
   line-height: 1.2;
-  color: var(--d-gold);
+  color: var(--d-dim);
 }
 .dim {
   color: var(--d-dim);
@@ -76,25 +84,28 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px 32px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid rgba(217, 168, 69, 0.28);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--d-line);
 }
+/* the page title: the same token as every h1 (globals .t-h1, --fs-h1) */
 .mastTitle {
-  margin: 10px 0 0;
+  margin: 14px 0 0;
   font-family: var(--serif);
+  font-optical-sizing: auto;
   font-weight: 500;
-  font-size: clamp(46px, 7.4vw, 92px);
-  line-height: 0.92;
-  letter-spacing: -0.035em;
+  font-size: var(--fs-h1, clamp(44px, 6vw, 88px));
+  line-height: 0.94;
+  letter-spacing: -0.04em;
   color: var(--d-text);
+  text-wrap: balance;
 }
 .mastLead {
-  max-width: 34rem;
-  margin: 16px 0 0;
-  font-size: 16px;
-  line-height: 1.55;
+  max-width: 36rem;
+  margin: 18px 0 0;
+  font-size: var(--fs-lead, 17px);
+  line-height: 1.6;
   color: var(--d-dim);
+  text-wrap: pretty;
 }
 
 .clock {
@@ -106,7 +117,7 @@
 .clockTime {
   font-family: var(--mono);
   font-size: 15px;
-  color: var(--d-gold-hi);
+  color: var(--d-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -128,32 +139,23 @@
   }
   .rowC {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: stretch; /* the board stands as tall as the season card */
   }
 }
 
-/* ── velvet panel: felt, gold hairline ───────────────────────── */
-.velvet {
+/* ── plum panel: the global .glass stock, brass hairline ─────── */
+.velvet,
+.board {
   position: relative;
   isolation: isolate;
   padding: clamp(22px, 3vw, 32px);
-  background:
-    radial-gradient(120% 90% at 15% 0%, rgba(74, 18, 54, 0.6), transparent 62%),
-    linear-gradient(180deg, var(--d-velvet), var(--d-velvet-lo));
-  border: 1px solid var(--d-gold-lo);
+  background: var(--d-panel);
+  border: 1px solid var(--d-line-strong);
+  border-radius: var(--key-radius, 8px);
   box-shadow:
-    inset 0 0 0 1px rgba(246, 220, 149, 0.2),
-    inset 0 24px 60px -30px rgba(0, 0, 0, 0.7),
-    0 30px 60px -36px rgba(0, 0, 0, 0.9);
-}
-.velvet::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: var(--noise, none);
-  opacity: 0.55;
-  mix-blend-mode: overlay;
-  pointer-events: none;
+    inset 0 0 0 1px rgba(246, 220, 149, 0.06),
+    inset 0 1px 0 rgba(246, 220, 149, 0.16),
+    var(--shadow-1);
 }
 .panelHead {
   display: flex;
@@ -169,38 +171,29 @@
   font-size: clamp(26px, 2.6vw, 34px);
   line-height: 1.05;
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
-/* ── brass plaque (balance) ───────────────────────────────────── */
+/* ── your stack (balance): a raised plum panel on four brass screws ── */
 .plaque {
-  --screw: radial-gradient(circle, #fff4cf 0 1px, var(--d-gold) 1.8px, var(--d-gold-lo) 3.6px, rgba(0, 0, 0, 0.7) 4.4px, transparent 5px);
+  --screw: radial-gradient(circle, #fff4cf 0 1px, var(--d-gold) 1.8px, var(--d-gold-lo) 3.6px, rgba(14, 9, 28, 0.6) 4.4px, transparent 5px);
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: clamp(26px, 3.6vw, 40px) clamp(24px, 3.6vw, 44px);
-  border: 3px solid transparent;
-  border-radius: 3px;
+  border: 1px solid var(--d-line-strong);
+  border-radius: var(--key-radius, 8px);
   background:
-    var(--screw) 10px 10px / 10px 10px no-repeat padding-box,
-    var(--screw) calc(100% - 10px) 10px / 10px 10px no-repeat padding-box,
-    var(--screw) 10px calc(100% - 10px) / 10px 10px no-repeat padding-box,
-    var(--screw) calc(100% - 10px) calc(100% - 10px) / 10px 10px no-repeat padding-box,
-    radial-gradient(90% 120% at 30% 0%, rgba(74, 18, 54, 0.55), transparent 70%) padding-box,
-    linear-gradient(180deg, #1c0a16, #0d0610) padding-box,
-    linear-gradient(
-        125deg,
-        var(--d-gold-lo),
-        var(--d-gold-hi) 18%,
-        var(--d-gold) 34%,
-        var(--d-gold-lo) 52%,
-        var(--d-gold) 70%,
-        var(--d-gold-hi) 84%,
-        var(--d-gold-lo)
-      )
-      border-box;
+    var(--screw) 12px 12px / 10px 10px no-repeat,
+    var(--screw) calc(100% - 12px) 12px / 10px 10px no-repeat,
+    var(--screw) 12px calc(100% - 12px) / 10px 10px no-repeat,
+    var(--screw) calc(100% - 12px) calc(100% - 12px) / 10px 10px no-repeat,
+    radial-gradient(90% 80% at 20% 0%, rgba(110, 84, 255, 0.1), transparent 70%), /* ≤0.1 keeps the purple eyebrow ≥4.5:1 */
+    linear-gradient(180deg, var(--d-raised-2), var(--d-raised));
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.8),
-    inset 0 0 0 2px rgba(246, 220, 149, 0.16),
-    inset 0 30px 60px -30px rgba(0, 0, 0, 0.8),
-    0 34px 70px -40px rgba(0, 0, 0, 0.95);
+    inset 0 0 0 1px rgba(246, 220, 149, 0.06),
+    inset 0 1px 0 rgba(246, 220, 149, 0.18),
+    var(--shadow-2);
 }
 .plaqueTop {
   display: flex;
@@ -213,16 +206,13 @@
   display: block;
   margin: clamp(18px, 2.6vw, 26px) 0 0;
   font-family: var(--serif);
-  font-weight: 700;
+  font-weight: 600;
   font-size: clamp(56px, 9.4vw, 116px);
+  font-variation-settings: "opsz" 24; /* big Bodoni keeps its hairlines (see globals h1/h2) */
   line-height: 0.9;
   letter-spacing: -0.04em;
   font-variant-numeric: lining-nums tabular-nums;
-  background: linear-gradient(180deg, var(--d-gold-hi) 8%, var(--d-gold) 52%, #a8782c 70%, var(--d-gold-hi) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.7));
+  color: var(--d-text);
   overflow-wrap: anywhere;
 }
 .bignumUnit {
@@ -231,28 +221,31 @@
   font-style: italic;
   font-size: 0.3em;
   letter-spacing: 0;
-  -webkit-text-fill-color: var(--d-gold);
+  color: var(--d-monad-text);
 }
-/* no number yet: faint engraving, no gold */
+/* no balance yet (signed out, signing in, loading): one quiet line, not a fake number */
 .bignumBlank {
-  background: none;
-  color: rgba(217, 168, 69, 0.22);
-  filter: none;
+  margin: clamp(22px, 3vw, 30px) 0 clamp(6px, 1vw, 10px);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(24px, 2.6vw, 32px);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--d-mute);
 }
 .engraved {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: clamp(22px, 3vw, 32px);
-  border-top: 1px solid rgba(0, 0, 0, 0.85);
-  box-shadow: inset 0 1px 0 rgba(217, 168, 69, 0.22);
+  border-top: 1px solid var(--d-line);
 }
 .engraved > div {
   padding: 14px 12px 0 0;
 }
 .engraved > div + div {
   padding-left: 14px;
-  border-left: 1px solid rgba(0, 0, 0, 0.85);
-  box-shadow: inset 1px 0 0 rgba(217, 168, 69, 0.16);
+  border-left: 1px solid var(--d-line);
 }
 .engravedK {
   font-family: var(--font-sans);
@@ -260,22 +253,23 @@
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: 0;
-  color: rgba(217, 168, 69, 0.78);
+  color: var(--d-mute);
 }
 .engravedV {
   margin-top: 6px;
   font-family: var(--mono);
   font-size: clamp(14px, 1.6vw, 17px);
-  color: var(--d-gold-hi);
+  color: var(--d-text);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 .wink {
-  margin: 22px 0 0;
+  margin: auto 0 0;
+  padding-top: 22px;
   font-family: var(--serif);
   font-style: italic;
   font-size: 15px;
-  color: rgba(217, 168, 69, 0.62);
+  color: var(--d-mute);
 }
 
 /* ── paper stock (tickets, slips, receipts, paytable) ────────── */
@@ -836,24 +830,27 @@ textarea.field {
   font-family: var(--serif);
   font-style: italic;
   font-size: 16px;
-  color: var(--d-gold);
+  color: var(--d-dim);
+}
+.dialWeek {
+  fill: var(--d-mute);
 }
 .onTable {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   margin-top: 22px;
   text-align: center;
 }
 .onTableNum {
   display: block;
   font-family: var(--serif);
-  font-weight: 700;
+  font-weight: 600;
   font-size: clamp(38px, 5vw, 54px);
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: lining-nums tabular-nums;
-  background: linear-gradient(180deg, var(--d-gold-hi) 10%, var(--d-gold) 55%, var(--d-gold-hi));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--d-text);
 }
 .rack {
   display: grid;
@@ -861,7 +858,7 @@ textarea.field {
   margin: 22px 0 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid rgba(217, 168, 69, 0.25);
+  border-top: 1px solid var(--d-line);
 }
 .rackRow {
   display: grid;
@@ -869,7 +866,7 @@ textarea.field {
   gap: 14px;
   align-items: end;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(217, 168, 69, 0.18);
+  border-bottom: 1px solid var(--d-line);
 }
 .stack {
   display: flex;
@@ -907,7 +904,7 @@ textarea.field {
 .rackAmt {
   font-family: var(--mono);
   font-size: 14px;
-  color: var(--d-gold-hi);
+  color: var(--d-text);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -934,53 +931,45 @@ textarea.field {
   font-style: normal;
   font-size: 14px;
   font-weight: 500;
-  color: var(--d-gold);
+  color: var(--d-text);
 }
 
-/* ── engraved leaderboard ─────────────────────────────────────── */
+/* ── the leaderboard: the same plum panel as the season card ── */
 .board {
-  position: relative;
-  padding: clamp(22px, 3vw, 30px);
-  background:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 7px),
-    linear-gradient(180deg, #1b0b15, #0e060b);
-  border: 1px solid var(--d-gold-lo);
-  box-shadow:
-    inset 0 0 0 4px #0b0509,
-    inset 0 0 0 5px rgba(217, 168, 69, 0.35),
-    0 30px 60px -36px rgba(0, 0, 0, 0.9);
-}
-.boardTitle {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
 }
 .boardRows {
   display: grid;
   margin: 18px 0 0;
   padding: 0;
   list-style: none;
-  counter-reset: none;
+  border-top: 1px solid var(--d-line);
 }
 .boardRow {
   display: grid;
   grid-template-columns: 2.4em auto minmax(12px, 1fr) auto;
   gap: 10px;
   align-items: baseline;
-  padding: 7px 4px;
+  padding: 7px 6px;
   font-family: var(--mono);
   font-size: 13.5px;
   font-variant-numeric: tabular-nums;
-  color: var(--d-gold);
-  text-shadow:
-    0 -1px 0 rgba(0, 0, 0, 0.9),
-    0 1px 0 rgba(246, 220, 149, 0.1);
+  color: var(--d-dim);
 }
 .boardRow[data-top="true"] {
-  color: var(--d-gold-hi);
+  color: var(--d-text);
 }
 .boardRow[data-me="true"] {
-  background: rgba(217, 168, 69, 0.1);
-  box-shadow: inset 2px 0 0 var(--d-gold-hi);
+  border-radius: 4px;
+  background: rgba(110, 84, 255, 0.2);
+  box-shadow: inset 2px 0 0 var(--d-monad-text);
+  color: var(--d-text);
+}
+/* an empty place on the board: greyed, no data */
+.boardRow[data-blank="true"] {
+  color: var(--d-mute);
+  opacity: 0.45;
 }
 .boardRank {
   font-family: var(--serif);
@@ -989,7 +978,7 @@ textarea.field {
   text-align: right;
 }
 .dots {
-  border-bottom: 1px dotted rgba(217, 168, 69, 0.35);
+  border-bottom: 1px dotted rgba(217, 207, 245, 0.28);
   transform: translateY(-4px);
 }
 .boardYou {
@@ -997,14 +986,20 @@ textarea.field {
   font-family: var(--serif);
   font-style: italic;
   font-size: 14px;
-  color: var(--d-gold-hi);
+  color: var(--d-monad-text);
 }
 .boardEmpty {
-  padding: 26px 0 8px;
-  text-align: center;
+  margin: 14px 0 0;
   font-family: var(--serif);
   font-style: italic;
-  font-size: 18px;
+  font-size: 17px;
+  color: var(--d-dim);
+}
+.boardFoot {
+  margin: auto 0 0;
+  padding-top: 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--d-mute);
 }
 
@@ -1147,14 +1142,17 @@ textarea.field {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--d-mute);
-  border: 1px dashed rgba(217, 168, 69, 0.3);
+  border: 1px dashed var(--d-line-strong);
+  border-radius: var(--key-radius-sm, 6px);
 }
 .devbar a {
-  color: var(--d-gold);
+  color: var(--d-dim);
 }
 .devbar a[aria-current="true"] {
-  color: var(--d-gold-hi);
+  color: var(--d-text);
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* ── admin (shares the desk) ──────────────────────────────────── */
@@ -1172,11 +1170,11 @@ textarea.field {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin-top: 20px;
-  border-top: 1px solid rgba(217, 168, 69, 0.22);
+  border-top: 1px solid var(--d-line);
 }
 .statGrid > div {
   padding: 14px 12px 14px 0;
-  border-bottom: 1px solid rgba(217, 168, 69, 0.14);
+  border-bottom: 1px solid var(--d-line);
 }
 .queue {
   display: grid;
@@ -1252,7 +1250,8 @@ textarea.field {
   .engraved > div + div {
     padding-left: 10px;
   }
-  .velvet {
+  .velvet,
+  .board {
     padding: 20px 16px;
   }
   .tabs {
@@ -1274,4 +1273,48 @@ textarea.field {
   .spin {
     animation: none;
   }
+}
+
+/* ── your season: category, shares, holding, season post ─────── */
+.standGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin-top: 18px;
+  border-top: 1px solid var(--d-line);
+}
+.standGrid > div {
+  padding: 14px 14px 14px 0;
+  border-bottom: 1px solid var(--d-line);
+}
+.standNote {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--d-dim);
+  text-wrap: pretty;
+}
+.standNote a {
+  color: var(--d-gold-hi);
+  text-decoration: underline;
+  text-decoration-color: rgb(217 168 69 / 0.45);
+  text-underline-offset: 0.2em;
+}
+.callout {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--d-line-strong);
+  border-radius: var(--key-radius-sm, 6px);
+  background: rgba(41, 19, 58, 0.72); /* sunk to the page plum */
+}
+.callout[data-hot="true"] {
+  border-color: var(--d-neon);
+  box-shadow: 0 0 0 1px rgba(255, 63, 174, 0.25);
+}
+.calloutText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--d-text);
 }
